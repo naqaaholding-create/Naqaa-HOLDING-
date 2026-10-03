@@ -64,15 +64,25 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import os, re
+          import os
           p=Path("app/build.gradle")
-          s=p.read_text(encoding="utf-8")
           target=os.environ["TARGET_SDK"]
-          s,n1=re.subn(r"targetSdk(?:Version)?\s+\d+", f"targetSdkVersion {target}", s, count=1)
-          s,n2=re.subn(r"compileSdk(?:Version)?\s+\d+", f"compileSdkVersion {target}", s, count=1)
-          if n1 != 1 or n2 != 1:
-              raise SystemExit(f"Could not set Android SDK: target={n1}, compile={n2}")
-          p.write_text(s,encoding="utf-8")
+          lines=p.read_text(encoding="utf-8").splitlines()
+          out=[]
+          changed_target=changed_compile=0
+          for line in lines:
+              stripped=line.strip()
+              if stripped.startswith("targetSdkVersion") or stripped.startswith("targetSdk "):
+                  out.append(line[:len(line)-len(line.lstrip())] + f"targetSdkVersion {target}")
+                  changed_target += 1
+              elif stripped.startswith("compileSdkVersion") or stripped.startswith("compileSdk "):
+                  out.append(line[:len(line)-len(line.lstrip())] + f"compileSdkVersion {target}")
+                  changed_compile += 1
+              else:
+                  out.append(line)
+          if changed_target != 1 or changed_compile != 1:
+              raise SystemExit(f"Could not set Android SDK: target={changed_target}, compile={changed_compile}")
+          p.write_text("\n".join(out)+"\n", encoding="utf-8")
           PY
 
       - name: Detect signing configuration
