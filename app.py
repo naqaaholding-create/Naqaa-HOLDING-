@@ -56,7 +56,7 @@ if REAL_MONEY_ENABLED:
     if _blockers:
         raise RuntimeError("REAL_MONEY_ENABLED=1 blocked by production safety gate: "+", ".join(_blockers))
 app=FastAPI(title="NAQAA Market API",version=APP_VERSION)
-CORS_ORIGINS=[x.strip() for x in os.getenv("CORS_ORIGINS","https://naqaaholding.wordpress.com").split(",") if x.strip()]
+CORS_ORIGINS=[x.strip() for x in os.getenv("CORS_ORIGINS","https://naqaaholding.wordpress.com,https://naqaaholding-create.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["Content-Type","Authorization","Idempotency-Key"])
 
 def now(): return datetime.now(timezone.utc).isoformat()
