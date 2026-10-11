@@ -123,6 +123,40 @@
       </div>
     </section>
 
+    <section class="panel account-panel" id="account">
+      <div class="section-heading">
+        <div><p class="eyebrow">ACCOUNT & USAGE</p><h2>حساب المستخدم وحصة الاستخدام</h2></div>
+        <span class="step">02</span>
+      </div>
+      <p class="account-intro">أنشئ حسابًا أو سجّل الدخول لعرض حصتك المحفوظة على الخادم. يلزم ضبط عنوان API ونشر الخادم أولًا.</p>
+      <div class="account-forms">
+        <form id="register-form" class="account-form">
+          <h3>إنشاء حساب</h3>
+          <label for="register-email">البريد الإلكتروني</label>
+          <input id="register-email" name="email" type="email" autocomplete="email" required maxlength="320" placeholder="name@example.com">
+          <label for="register-password">كلمة المرور (10 أحرف على الأقل)</label>
+          <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+          <button class="button button-primary button-full" type="submit">إنشاء حساب تجريبي</button>
+        </form>
+        <form id="login-form" class="account-form">
+          <h3>تسجيل الدخول</h3>
+          <label for="login-email">البريد الإلكتروني</label>
+          <input id="login-email" name="email" type="email" autocomplete="email" required maxlength="320" placeholder="name@example.com">
+          <label for="login-password">كلمة المرور</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="128" required>
+          <button class="button button-secondary button-full" type="submit">دخول</button>
+        </form>
+      </div>
+      <div id="account-status" class="plan-notice" role="status" aria-live="polite">الخادم غير مضبوط في هذه النسخة. لن تُرسل بيانات الدخول إلى أي جهة قبل إعداد عنوان API.</div>
+      <div id="usage-panel" class="usage-panel" hidden>
+        <div class="usage-heading"><h3>ملخص الحصة</h3><button id="refresh-usage" class="button button-secondary" type="button">تحديث</button></div>
+        <p id="usage-plan"></p>
+        <div class="usage-grid"><div><span>المواقع المستخدمة</span><strong id="sites-usage">—</strong></div><div><span>الاستفسارات المستخدمة</span><strong id="questions-usage">—</strong></div></div>
+        <p class="helper">عرض الحصة لا يعني توفر التحليل الآلي أو الدفع. لا تفعّل باقة مدفوعة قبل إتمام ربط الدفع والتحقق منه على الخادم.</p>
+        <button id="logout-button" class="button button-secondary" type="button">تسجيل الخروج</button>
+      </div>
+    </section>
+
     <section class="panel pricing-panel" id="subscriptions">
       <div class="section-heading">
         <div><p class="eyebrow">PLANS & ACCESS</p><h2>باقات مختبر نقاء</h2></div>
@@ -168,6 +202,8 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="api-config.js"></script>
+  <script src="account.js"></script>
   <script src="subscriptions.js"></script>
   <script src="app.js"></script>
 </body>
