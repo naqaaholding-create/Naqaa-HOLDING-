@@ -37,6 +37,8 @@ jobs:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
       - name: Install Capacitor dependencies
         run: npm install
+      - name: Prepare web assets
+        run: mkdir -p www && cp *.html *.css *.js www/
       - name: Add Android platform
         run: npx cap add android
       - name: Sync app assets
