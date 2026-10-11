@@ -34,7 +34,10 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools,platforms;android-35,build-tools;35.0.0"
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
       - name: Install Capacitor dependencies
         run: npm install
       - name: Add Android platform
