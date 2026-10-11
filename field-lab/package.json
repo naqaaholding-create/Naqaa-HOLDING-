@@ -1,0 +1,19 @@
+{
+  "name": "naqaa-field-lab",
+  "version": "0.2.0",
+  "private": true,
+  "description": "NAQAA Field Lab mobile prototype",
+  "scripts": {
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/geolocation": "^7.1.5",
+    "@capacitor/camera": "^7.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3"
+  }
+}
