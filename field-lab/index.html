@@ -7,6 +7,7 @@
   <meta name="description" content="NAQAA Field Lab — سجل ميداني للمواقع والصور والإحداثيات وبيانات المسح.">
   <title>NAQAA Field Lab | مختبر نقاء الميداني</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="subscriptions.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
@@ -122,6 +123,38 @@
       </div>
     </section>
 
+    <section class="panel pricing-panel" id="subscriptions">
+      <div class="section-heading">
+        <div><p class="eyebrow">PLANS & ACCESS</p><h2>باقات مختبر نقاء</h2></div>
+        <span class="step">03</span>
+      </div>
+      <p class="pricing-intro">اختر الباقة المناسبة لحجم عملك الميداني. الأسعار والحدود أدناه مقترحة للنسخة التجريبية، ولا يوجد تحصيل مالي أو تفعيل اشتراك إلكتروني حتى الآن.</p>
+      <div class="plans-grid">
+        <article class="plan-card plan-trial">
+          <span class="plan-label">للتجربة</span><h3>التجربة المجانية</h3><p class="plan-price">$0 <small>/ مجانًا</small></p>
+          <ul><li>موقعان كحد أقصى</li><li>10 استفسارات إجمالًا</li><li>تقرير واحد لكل موقع عند توفر التحليل</li></ul>
+          <button class="button button-secondary button-full plan-info" type="button" data-plan="التجربة المجانية">تفاصيل الباقة</button>
+        </article>
+        <article class="plan-card">
+          <span class="plan-label">استخدام قصير</span><h3>الاشتراك اليومي</h3><p class="plan-price">$10 <small>/ يوم</small></p>
+          <ul><li>موقعان خلال مدة الاشتراك</li><li>20 استفسارًا يوميًا</li><li>تقرير واحد لكل موقع</li></ul>
+          <button class="button button-secondary button-full plan-info" type="button" data-plan="الاشتراك اليومي">تفاصيل الباقة</button>
+        </article>
+        <article class="plan-card">
+          <span class="plan-label">عمل ميداني</span><h3>الاشتراك الأسبوعي</h3><p class="plan-price">$50 <small>/ 7 أيام</small></p>
+          <ul><li>10 مواقع خلال 7 أيام</li><li>100 استفسار خلال الأسبوع</li><li>تقرير واحد لكل موقع</li></ul>
+          <button class="button button-secondary button-full plan-info" type="button" data-plan="الاشتراك الأسبوعي">تفاصيل الباقة</button>
+        </article>
+        <article class="plan-card plan-featured">
+          <span class="plan-label">للاستخدام المنتظم</span><h3>الاشتراك الشهري</h3><p class="plan-price">$100 <small>/ 30 يومًا</small></p>
+          <ul><li>30 موقعًا خلال 30 يومًا</li><li>300 استفسار خلال الشهر</li><li>تقرير واحد لكل موقع</li></ul>
+          <button class="button button-primary button-full plan-info" type="button" data-plan="الاشتراك الشهري">تفاصيل الباقة</button>
+        </article>
+      </div>
+      <div class="plan-notice" id="plan-message" role="status" aria-live="polite">تنبيه: الباقات للعرض والتخطيط فقط. الدفع، حساب المستخدم، واحتساب الحصص تحتاج إلى خادم آمن وتكامل دفع قبل إطلاق الاشتراكات.</div>
+      <p class="helper">الموقع المقصود هنا سجل موقع جديد ضمن حصة الباقة. وحدود الاستخدام مقترحة وقابلة للتعديل قبل الإطلاق.</p>
+    </section>
+
     <section class="panel roadmap">
       <div><p class="eyebrow">NEXT ANALYSIS MODULES</p><h2>مسارات التطوير العلمي</h2><p>هذه النسخة تبدأ بالتوثيق المنظم؛ وحدات التحليل المتقدم تُضاف بعد توفير مصادر البيانات والمراجع.</p></div>
       <div class="module-list">
@@ -135,6 +168,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="subscriptions.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
