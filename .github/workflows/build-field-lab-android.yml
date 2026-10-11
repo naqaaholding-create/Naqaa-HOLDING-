@@ -1,0 +1,53 @@
+name: Build NAQAA Field Lab Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "field-lab/**"
+      - ".github/workflows/build-field-lab-android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: field-lab
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: field-lab/package.json
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Capacitor dependencies
+        run: npm install
+      - name: Add Android platform
+        run: npx cap add android
+      - name: Sync app assets
+        run: npx cap sync android
+      - name: Build debug APK
+        working-directory: field-lab/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: naqaa-field-lab-debug-apk
+          path: field-lab/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
