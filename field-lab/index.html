@@ -158,6 +158,26 @@
       </div>
     </section>
 
+    <section class="panel wallet-panel" id="internal-wallet">
+      <div class="section-heading">
+        <div><p class="eyebrow">INTERNAL WALLET</p><h2>المحفظة الداخلية</h2></div>
+        <span class="step">03</span>
+      </div>
+      <p class="pricing-intro">محفظة داخل التطبيق للتجربة وقراءة ملخص الحساب فقط. لا تتصل بمحفظة خارجية ولا تنفذ إيداعًا أو سحبًا حقيقيًا.</p>
+      <div class="wallet-summary">
+        <div><span>رصيد تجريبي</span><strong id="wallet-balance">0.00 EUR</strong><small>ليس أموالًا حقيقية</small></div>
+        <div><span>حالة المحفظة</span><strong class="wallet-status">محلية / تجريبية</strong><small id="wallet-account">الحساب: لم يتم تسجيل الدخول عبر خادم</small></div>
+      </div>
+      <div class="wallet-actions">
+        <button class="button button-primary" id="wallet-add-demo" type="button">إضافة حركة اختبارية</button>
+        <button class="button button-secondary" id="wallet-refresh" type="button">تحديث الحساب</button>
+        <button class="button button-secondary" id="wallet-reset" type="button">إعادة ضبط التجربة</button>
+      </div>
+      <h3>سجل الحركات التجريبية</h3>
+      <div id="wallet-ledger" class="wallet-ledger"><p class="helper">لا توجد حركات حتى الآن.</p></div>
+      <p class="helper" id="wallet-notice" role="status" aria-live="polite">وضع الاختبار: أي حركة تُحفظ على هذا الجهاز فقط، ولا تمثل معاملة مالية أو رصيدًا قابلًا للسحب.</p>
+    </section>
+
     <section class="panel pricing-panel" id="subscriptions">
       <div class="section-heading">
         <div><p class="eyebrow">PLANS & ACCESS</p><h2>باقات مختبر نقاء</h2></div>
@@ -228,6 +248,6 @@
   <script src="account.js"></script>
   <script src="subscriptions.js"></script>
   <script src="sharing.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js"></script>\n  <script src="wallet.js"></script>
 </body>
 </html>
