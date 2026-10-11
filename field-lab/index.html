@@ -8,6 +8,7 @@
   <title>NAQAA Field Lab | مختبر نقاء الميداني</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="subscriptions.css">
+  <link rel="stylesheet" href="sharing.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
@@ -189,6 +190,27 @@
       <p class="helper">الموقع المقصود هنا سجل موقع جديد ضمن حصة الباقة. وحدود الاستخدام مقترحة وقابلة للتعديل قبل الإطلاق.</p>
     </section>
 
+
+    <section class="panel distribution-panel" id="share-app">
+      <div class="section-heading">
+        <div><p class="eyebrow">APP DISTRIBUTION</p><h2>مشاركة مختبر نقاء وتثبيته</h2></div>
+        <span class="step">04</span>
+      </div>
+      <p class="distribution-intro">شارك رابط النسخة المنشورة عبر التطبيقات، أو انقل ملف APK بين أجهزة Android. يجب نشر رابط HTTPS فعلي أولًا؛ رابط المعاينة المحلية لا يصلح للمشاركة.</p>
+      <div class="share-buttons">
+        <button type="button" class="button button-primary" id="native-share-button">مشاركة الرابط من الهاتف</button>
+        <button type="button" class="button button-secondary" id="copy-share-link">نسخ رابط التطبيق</button>
+        <a class="button button-secondary" id="whatsapp-share" href="https://wa.me/" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a class="button button-secondary" id="telegram-share" href="https://t.me/share/url" target="_blank" rel="noopener noreferrer">Telegram</a>
+        <a class="button button-secondary" id="facebook-share" href="https://www.facebook.com/sharer/sharer.php" target="_blank" rel="noopener noreferrer">Facebook</a>
+      </div>
+      <div class="distribution-notes">
+        <div><strong>Bluetooth أو Quick Share</strong><p>بعد تنزيل ملف APK النهائي إلى هاتف Android، افتح تطبيق «الملفات» أو «التنزيلات»، اختر ملف APK، ثم «مشاركة» واختر Bluetooth أو Quick Share. قد يلزم السماح بتثبيت التطبيقات من هذا المصدر على جهاز المستلم.</p></div>
+        <div><strong>قبل التثبيت</strong><p>لا تثبّت ملفًا إلا إذا كان من رابط رسمي موثوق. نسخة Debug للتجربة وليست إصدارًا نهائيًا للمتاجر. قد تظهر تحذيرات أمان عند تثبيت APK خارج المتجر.</p></div>
+      </div>
+      <p class="helper" id="share-status" role="status" aria-live="polite">روابط المشاركة ستستخدم عنوان الصفحة الحالية. لا يظهر رابط تنزيل APK هنا إلا بعد نجاح البناء ونشر الملف في مكان متاح.</p>
+    </section>
+
     <section class="panel roadmap">
       <div><p class="eyebrow">NEXT ANALYSIS MODULES</p><h2>مسارات التطوير العلمي</h2><p>هذه النسخة تبدأ بالتوثيق المنظم؛ وحدات التحليل المتقدم تُضاف بعد توفير مصادر البيانات والمراجع.</p></div>
       <div class="module-list">
@@ -205,6 +227,7 @@
   <script src="api-config.js"></script>
   <script src="account.js"></script>
   <script src="subscriptions.js"></script>
+  <script src="sharing.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
