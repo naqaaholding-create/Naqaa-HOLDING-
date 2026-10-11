@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#173f35">
+  <meta name="description" content="NAQAA Field Lab — سجل ميداني للمواقع والصور والإحداثيات وبيانات المسح.">
+  <title>NAQAA Field Lab | مختبر نقاء الميداني</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">ن</div>
+    <div class="brand">
+      <p class="eyebrow">NAQAA HOLDING</p>
+      <h1>مختبر نقاء الميداني</h1>
+      <p class="subtitle">توثيق المواقع وتحليل صور الأرض</p>
+    </div>
+    <span class="local-badge"><span></span> حفظ محلي</span>
+  </header>
+
+  <main class="container">
+    <section class="intro panel">
+      <div>
+        <p class="eyebrow">FIELD RESEARCH WORKSPACE</p>
+        <h2>من الملاحظة الميدانية إلى تقرير موثّق</h2>
+        <p>سجّل الموقع والصور والملاحظات في مكان واحد. لن نطلب الموقع أو الكاميرا إلا عندما تختار ذلك.</p>
+      </div>
+      <div class="intro-symbol" aria-hidden="true">⌖</div>
+    </section>
+
+    <div class="notice" role="note">
+      <strong>تنبيه علمي:</strong> الصور الفضائية وحدها لا تثبت وجود آثار أو تجاويف أو مياه جوفية. تُعرض النتائج كقرائن تحتاج إلى تحقق ميداني ومراجع موثوقة.
+    </div>
+
+    <section class="grid-layout">
+      <div class="panel form-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">NEW OBSERVATION</p><h2>إنشاء سجل ميداني</h2></div>
+          <span class="step">01</span>
+        </div>
+        <form id="record-form">
+          <label for="site-name">اسم الموقع أو رمز العينة <span class="required">*</span></label>
+          <input id="site-name" name="siteName" required maxlength="100" placeholder="مثال: الموقع A-01">
+
+          <label for="observation-type">نوع الملاحظة</label>
+          <select id="observation-type" name="type">
+            <option value="surface">ملاحظة سطحية / تضاريس</option>
+            <option value="rock">صخر أو نقش محتمل</option>
+            <option value="satellite">ملاحظة من صورة فضائية</option>
+            <option value="gpr">بيانات رادار اختراق الأرض (GPR)</option>
+            <option value="ert">بيانات المقاومة الكهربائية (ERT)</option>
+            <option value="water">ملاحظة مرتبطة بالمياه</option>
+            <option value="other">أخرى</option>
+          </select>
+
+          <div class="field-label-row">
+            <label>الإحداثيات</label>
+            <button class="button button-secondary button-small" type="button" id="location-button">⌖ تحديد موقعي</button>
+          </div>
+          <p id="location-status" class="helper" aria-live="polite">لم يتم طلب الموقع. اضغط الزر إذا أردت إرفاق الإحداثيات.</p>
+          <div class="two-fields">
+            <div><label for="latitude">خط العرض</label><input id="latitude" inputmode="decimal" placeholder="—"></div>
+            <div><label for="longitude">خط الطول</label><input id="longitude" inputmode="decimal" placeholder="—"></div>
+          </div>
+          <label for="coordinate-source">مصدر الإحداثيات / الدقة</label>
+          <input id="coordinate-source" placeholder="مثال: GPS الهاتف، الدقة 8 م">
+
+          <div class="field-label-row">
+            <label>الصور الميدانية</label>
+            <button class="button button-secondary button-small" type="button" id="camera-button">فتح الكاميرا</button>
+          </div>
+          <div class="camera-box">
+            <video id="camera-preview" autoplay playsinline muted hidden></video>
+            <div id="camera-placeholder" class="camera-placeholder"><span>▧</span><p>يمكنك التقاط صورة أو اختيار صور من جهازك.</p></div>
+            <button id="capture-button" type="button" class="button button-primary" hidden>التقاط الصورة</button>
+          </div>
+          <label for="photo-input">اختيار صور من الجهاز</label>
+          <input id="photo-input" type="file" accept="image/*" multiple>
+          <div id="photo-preview" class="photo-preview" aria-live="polite"></div>
+
+          <label for="notes">الملاحظات الميدانية</label>
+          <textarea id="notes" rows="4" maxlength="5000" placeholder="صف ما تراه دون الجزم بتفسير غير متحقق..."></textarea>
+
+          <label for="measurements">قياسات أو بيانات مسح (اختياري)</label>
+          <textarea id="measurements" rows="2" maxlength="3000" placeholder="الأبعاد، وجود مقياس بالصورة، أو ملاحظات GPR / ERT"></textarea>
+
+          <button type="submit" class="button button-primary button-full">حفظ السجل على هذا الجهاز</button>
+          <p class="helper">تُحفظ السجلات والصور داخل متصفح هذا الجهاز. لا يتم إرسالها إلى خادم.</p>
+        </form>
+      </div>
+
+      <div class="right-column">
+        <section class="panel map-panel">
+          <div class="section-heading">
+            <div><p class="eyebrow">LOCATION VIEW</p><h2>خريطة الموقع</h2></div>
+            <span class="step">02</span>
+          </div>
+          <div class="map-controls">
+            <button id="street-layer" type="button" class="layer-button active">خريطة الشوارع</button>
+            <button id="satellite-layer" type="button" class="layer-button">صور فضائية</button>
+          </div>
+          <div id="map" role="img" aria-label="خريطة للمواقع التي تختار تسجيلها"></div>
+          <p class="helper">الخريطة تحتاج إلى اتصال بالإنترنت. اختر طبقة الصور الفضائية لمعاينة صورة سطح الأرض، وليست تحليلًا أثريًا آليًا.</p>
+          <a id="open-map-link" class="text-link" href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer">فتح الخريطة في نافذة مستقلة ↗</a>
+        </section>
+
+        <section class="panel records-panel">
+          <div class="section-heading">
+            <div><p class="eyebrow">FIELD LOGBOOK</p><h2>السجلات المحفوظة</h2></div>
+            <span id="record-count" class="count">0</span>
+          </div>
+          <div id="records-list" class="records-list">
+            <div class="empty-state"><span>⌁</span><h3>لا توجد سجلات بعد</h3><p>أنشئ أول سجل لتظهر هنا المواقع والصور والملاحظات.</p></div>
+          </div>
+          <div class="export-actions">
+            <button id="export-button" type="button" class="button button-secondary" disabled>تصدير السجلات JSON</button>
+            <button id="clear-button" type="button" class="button button-quiet" disabled>حذف جميع السجلات</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="panel roadmap">
+      <div><p class="eyebrow">NEXT ANALYSIS MODULES</p><h2>مسارات التطوير العلمي</h2><p>هذه النسخة تبدأ بالتوثيق المنظم؛ وحدات التحليل المتقدم تُضاف بعد توفير مصادر البيانات والمراجع.</p></div>
+      <div class="module-list">
+        <div><span class="module-icon">⌁</span><span><strong>النقوش والصخور</strong><small>توثيق الصور والقياسات والمقارنة بالمراجع</small></span><em>المرحلة التالية</em></div>
+        <div><span class="module-icon">◈</span><span><strong>التضاريس ثلاثية الأبعاد</strong><small>طبقات ارتفاع وكنتور ونماذج تضاريس</small></span><em>المرحلة التالية</em></div>
+        <div><span class="module-icon">⌇</span><span><strong>GPR / ERT</strong><small>استيراد المقاطع وبيانات أجهزة المسح</small></span><em>يتطلب بيانات</em></div>
+      </div>
+    </section>
+    <footer><span>NAQAA FIELD LAB</span><span>نسخة أولية • بياناتك محفوظة محليًا</span></footer>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
