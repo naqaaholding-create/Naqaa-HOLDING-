@@ -14,3 +14,21 @@
 .plan-notice{border:1px solid #eadfbf;background:#fff8e6;color:#6b572b;border-radius:10px;padding:11px 13px;margin-top:14px;font-size:12px}
 @media(max-width:1000px){.plans-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.plans-grid{grid-template-columns:1fr}.plan-card{padding:15px}.plan-price{font-size:26px}}
+
+/* Account and quota UI */
+.account-panel{margin-top:20px}
+.account-intro{font-size:13px;color:var(--muted)}
+.account-forms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:15px}
+.account-form{display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.account-form h3,.usage-heading h3{font-size:15px;margin:0 0 5px}
+.account-form label{font-size:12px;color:var(--muted)}
+.account-form input{width:100%;min-height:42px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font:inherit;direction:ltr;text-align:left;background:#fff;color:var(--ink)}
+.account-form .button{margin-top:7px}
+.account-error{border-color:#e7b7b7;background:#fff0f0;color:#8b2525}
+.usage-panel{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:15px}
+.usage-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.usage-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.usage-grid>div{padding:13px;background:var(--mint);border-radius:10px;display:flex;flex-direction:column;gap:7px}
+.usage-grid span{font-size:12px;color:var(--muted)}
+.usage-grid strong{font-size:20px;color:var(--green)}
+@media(max-width:620px){.account-forms{grid-template-columns:1fr}.usage-grid{grid-template-columns:1fr}}
