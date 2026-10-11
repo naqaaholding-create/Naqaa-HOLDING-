@@ -1,0 +1,9 @@
+{
+  "appId": "com.naqaaholding.fieldlab",
+  "appName": "NAQAA Field Lab",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  }
+}
