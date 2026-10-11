@@ -31,13 +31,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Install Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
       - name: Install Capacitor dependencies
         run: npm install
       - name: Add Android platform
