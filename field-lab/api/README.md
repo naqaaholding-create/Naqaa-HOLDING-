@@ -32,10 +32,14 @@ Open `/docs` for the interactive API reference and `/health` for a health check.
 - Weekly: $50, 10 site records and 100 questions per 7-day window.
 - Monthly: $100, 30 site records and 300 questions per 30-day window.
 
+## Tests
+
+Run `pip install -r requirements.txt pytest httpx` and then `pytest -q`. GitHub Actions runs these tests when files in `field-lab/api/` change.
+
 ## Important limitations
 
 - Payments are disabled. Paid plans cannot be purchased or self-activated. Do not treat a displayed price as a payment integration.
-- The UI has not yet been wired to this API; this is a separate first backend milestone.
+- The account UI is not yet fully integrated with actual site creation; the API is an initial backend milestone.
 - Usage limits must be checked by the server before creating records or running any analysis. The client must not call `/usage/consume` until it is ready to perform the corresponding action, or users could consume quota without completing it.
 - Before production: configure a strong secret, HTTPS, an externally managed database, database migrations, rate limiting, account verification/password reset, audit logging, backups, and a verified payment provider/webhook. Add atomic quota consumption / idempotency for concurrent requests before public launch.
 - No automatic scientific image analysis is provided by this API.
