@@ -394,6 +394,8 @@
     el("photo-input").addEventListener("change", function (event) {
       var files = Array.prototype.slice.call(event.target.files || []).filter(function (file) { return file.type.indexOf("image/") === 0; });
       if (!files.length) return;
+      if (pendingPhotos.length + files.length > 6) { toast("الحد الأقصى 6 صور لكل سجل."); event.target.value = ""; return; }
+      if (files.some(function (file) { return file.size > 12 * 1024 * 1024; })) { toast("حجم إحدى الصور يتجاوز 12 ميغابايت."); event.target.value = ""; return; }
       Promise.all(files.map(fileToDataURL)).then(function (photos) {
         pendingPhotos = pendingPhotos.concat(photos);
         showPendingPhotos();
