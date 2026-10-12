@@ -1,0 +1,10 @@
+/* Page navigation for NAQAA Field Lab */
+.app-navigation{position:sticky;top:0;z-index:900;margin:0 0 18px;padding:10px;background:rgba(248,250,247,.96);backdrop-filter:blur(12px);border:1px solid #dce6df;border-radius:16px;box-shadow:0 8px 24px rgba(18,48,38,.08)}
+.app-navigation .nav-title{font-size:.78rem;color:#61746a;margin:0 0 8px;font-weight:700}
+.app-navigation .nav-items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.app-navigation button{font:inherit;min-height:44px;padding:9px 7px;border:1px solid #d4e0d8;border-radius:11px;background:#fff;color:#25483b;font-weight:700;cursor:pointer}
+.app-navigation button[aria-current="page"]{background:#173f35;color:#fff;border-color:#173f35;box-shadow:0 4px 12px rgba(23,63,53,.18)}
+.app-navigation button:focus-visible{outline:3px solid #c58d43;outline-offset:2px}
+.page-status{margin:8px 2px 0;color:#607368;font-size:.78rem}
+[hidden].app-page{display:none!important}
+@media(min-width:760px){.app-navigation .nav-items{grid-template-columns:repeat(6,minmax(0,1fr))}.app-navigation{top:8px}}
