@@ -73,7 +73,7 @@
     return lines.slice(1).map(function(line){
       var c=line.split(/[;,\t]/).map(function(s){return Number(s.trim());});
       return {distance:c[di],depth:c[zi],value:c[vi]};
-    }).filter(function(r){return Number.isFinite(r.distance)&&Number.isFinite(r.depth)&&Number.isFinite(r.value)&&r.distance>=0&&r.depth>=0;});
+    }).filter(function(r){return Number.isFinite(r.distance)&&Number.isFinite(r.depth)&&Number.isFinite(r.value)&&r.distance>=0&&r.distance<=50&&r.depth>=0;});
   }
   function drawUnderground(rows) {
     var svg=byId("underground-chart"); svg.textContent="";
@@ -105,7 +105,7 @@
         origin=coordinates();
         distance=Number(byId("terrain-distance").value);
         bearing=Number(byId("terrain-bearing").value);
-        if(!Number.isFinite(distance)||distance<100||distance>5000)throw new Error("المسافة يجب أن تكون بين 100 و5000 متر.");
+        if(!Number.isFinite(distance)||distance<5||distance>50)throw new Error("المسافة يجب أن تكون بين 5 و50 مترًا، ضمن قطر الموقع المحدد.");
         if(!Number.isFinite(bearing)||bearing<0||bearing>359)throw new Error("الاتجاه يجب أن يكون بين 0 و359 درجة.");
       } catch(e){showStatus("terrain-status",e.message,true);return;}
       terrainButton.disabled=true; showStatus("terrain-status","جارٍ جلب ارتفاعات سطح الأرض من مصدر الارتفاعات عبر الإنترنت…",false);
