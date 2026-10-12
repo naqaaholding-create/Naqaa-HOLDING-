@@ -71,9 +71,13 @@
     var di=col(["distance_m","distance","المسافة","المسافة_م"]), zi=col(["depth_m","depth","العمق","العمق_م"]), vi=col(["value","reading","amplitude","resistivity","القيمة","القراءة"]);
     if (di<0 || zi<0 || vi<0) throw new Error("عناوين CSV المطلوبة: distance_m,depth_m,value");
     return lines.slice(1).map(function(line){
-      var c=line.split(/[;,\t]/).map(function(s){return Number(s.trim());});
-      return {distance:c[di],depth:c[zi],value:c[vi]};
-    }).filter(function(r){return Number.isFinite(r.distance)&&Number.isFinite(r.depth)&&Number.isFinite(r.value)&&r.distance>=0&&r.distance<=50&&r.depth>=0;});
+      var c=line.split(/[;,\t]/).map(function(s){return s.trim();});
+      var raw=[c[di],c[zi],c[vi]];
+      if(raw.some(function(s){return s===undefined||s==="";}))return null;
+      var nums=raw.map(Number);
+      if(nums.some(function(n){return !Number.isFinite(n);}))return null;
+      return {distance:nums[0],depth:nums[1],value:nums[2]};
+    }).filter(function(r){return r!==null&&r.distance>=0&&r.distance<=50&&r.depth>=0;});
   }
   function drawUnderground(rows) {
     var svg=byId("underground-chart"); svg.textContent="";
