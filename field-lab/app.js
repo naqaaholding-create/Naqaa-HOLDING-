@@ -303,6 +303,7 @@
   }
 
   function capturePhoto() {
+    if (pendingPhotos.length >= 6) { toast("وصلت إلى الحد الأقصى: 6 صور لكل سجل. احذف صورة قبل التقاط أخرى."); return; }
     var video = el("camera-preview");
     if (!video.videoWidth || !video.videoHeight) { toast("انتظر حتى تصبح صورة الكاميرا جاهزة."); return; }
     var canvas = document.createElement("canvas");
