@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="navigation.css">
   <link rel="stylesheet" href="subscriptions.css">
   <link rel="stylesheet" href="sharing.css">
-  <link rel="stylesheet" href="wallet.css">
+  <link rel="stylesheet" href="wallet.css">\n  <link rel="stylesheet" href="research-analysis.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
@@ -233,7 +233,37 @@
       <p class="helper" id="share-status" role="status" aria-live="polite">روابط المشاركة ستستخدم عنوان الصفحة الحالية. لا يظهر رابط تنزيل APK هنا إلا بعد نجاح البناء ونشر الملف في مكان متاح.</p>
     </section>
 
-    <section class="panel roadmap">
+
+    <section class="panel evidence-panel" id="evidence-analysis">
+      <div class="section-heading">
+        <div><p class="eyebrow">EVIDENCE NOTEBOOK</p><h2>توثيق الإشارات وتحضير تقرير ميداني</h2></div>
+        <span class="step">06</span>
+      </div>
+      <div class="evidence-warning"><strong>حدود علمية مهمة:</strong> هذه الوحدة تنظّم الأدلة والملاحظات ولا تكشف الدفائن أو تفسّر الرموز آليًا. لا تحفر ولا تلمس نقشًا أو موقعًا أثريًا اعتمادًا على تخمين؛ استشر مختصًا والجهات المعنية بحماية التراث.</div>
+      <form id="evidence-report-form">
+        <div class="evidence-grid">
+          <div><label for="evidence-site-name">اسم الموقع أو رقم السجل *</label><input id="evidence-site-name" required maxlength="100" placeholder="مثال: NQ-LOC-001"></div>
+          <div><label for="evidence-feature-type">نوع العلامة المرصودة</label><select id="evidence-feature-type"><option value="rock_mark">علامة على صخر / نقش محتمل</option><option value="surface_shape">شكل تضاريسي سطحي</option><option value="satellite_anomaly">اختلاف ظاهر في صورة فضائية</option><option value="historic_structure">بقايا منشأة أو بناء محتمل</option><option value="gpr_profile">مقطع رادار اختراق الأرض GPR</option><option value="ert_profile">بيانات المقاومة الكهربائية ERT</option><option value="other">أخرى / غير معروف</option></select></div>
+          <div><label for="evidence-source">مصدر الدليل</label><select id="evidence-source"><option value="field_photo">صورة ميدانية</option><option value="satellite_imagery">صورة فضائية / خريطة</option><option value="historic_document">وثيقة أو مرجع تاريخي</option><option value="gpr">جهاز GPR</option><option value="ert">جهاز ERT</option><option value="other">مصدر آخر</option></select></div>
+          <div><label for="evidence-source-date">تاريخ الصورة أو المسح (إن عُرف)</label><input id="evidence-source-date" type="date"></div>
+          <div><label for="evidence-latitude">خط العرض</label><input id="evidence-latitude" inputmode="decimal" placeholder="اختياري"></div>
+          <div><label for="evidence-longitude">خط الطول</label><input id="evidence-longitude" inputmode="decimal" placeholder="اختياري"></div>
+        </div>
+        <button class="button button-secondary button-small" type="button" id="copy-current-location">نسخ إحداثيات النموذج الأساسي</button>
+        <label for="evidence-coordinate-note">مصدر الإحداثيات ودقتها</label><input id="evidence-coordinate-note" maxlength="250" placeholder="مثال: GPS الهاتف، دقة ظاهرة 7 أمتار">
+        <label for="evidence-photo">إرفاق صورة دليل (حتى 12 ميغابايت)</label><input id="evidence-photo" type="file" accept="image/*">
+        <div id="evidence-photo-preview" class="evidence-photo-preview"></div>
+        <label for="evidence-description">الوصف المباشر لما تراه *</label><textarea id="evidence-description" required rows="3" maxlength="5000" placeholder="الشكل، الأبعاد التقريبية، الاتجاه، مقياس الصورة، حالة السطح..."></textarea>
+        <label for="evidence-hypothesis">تفسير أو فرضية أولية (اختياري)</label><textarea id="evidence-hypothesis" rows="2" maxlength="2500" placeholder="اكتبها كفرضية، لا كحقيقة مؤكدة."></textarea>
+        <label for="evidence-alternatives">تفسيرات بديلة يجب استبعادها</label><textarea id="evidence-alternatives" rows="2" maxlength="2500" placeholder="تعرية طبيعية، أعمال حديثة، ظلال، آثار زراعية أو اختلاف في الإضاءة..."></textarea>
+        <label for="evidence-measurements">القياسات أو بيانات الجهاز</label><textarea id="evidence-measurements" rows="2" maxlength="3000" placeholder="مقياس، نوع الجهاز، إعدادات المسح، عمق/مقياس موثق إن توفر..."></textarea>
+        <label for="evidence-confidence">حالة الملاحظة (ليست درجة ذكاء اصطناعي)</label><select id="evidence-confidence"><option value="unverified">غير متحقق منها</option><option value="needs_expert_review">تحتاج مراجعة مختص</option><option value="supported_by_source">توجد مراجع داعمة مرفقة</option></select>
+        <div class="evidence-actions"><button class="button button-primary" type="submit">إعداد تقرير التوثيق</button><button class="button button-secondary" id="download-evidence-report" type="button" disabled>تنزيل التقرير JSON</button><button class="button button-quiet" id="reset-evidence-report" type="button">مسح النموذج</button></div>
+        <p id="evidence-report-preview" class="evidence-result" role="status" aria-live="polite"></p>
+        <p id="evidence-status" class="helper evidence-helper" role="status" aria-live="polite">تعمل هذه الوحدة محليًا؛ لا ترفع الصور ولا ترسل الإحداثيات إلى خادم.</p>
+      </form>
+    </section>
+\n    <section class="panel roadmap">
       <div><p class="eyebrow">NEXT ANALYSIS MODULES</p><h2>مسارات التطوير العلمي</h2><p>هذه النسخة تبدأ بالتوثيق المنظم؛ وحدات التحليل المتقدم تُضاف بعد توفير مصادر البيانات والمراجع.</p></div>
       <div class="module-list">
         <div><span class="module-icon">⌁</span><span><strong>النقوش والصخور</strong><small>توثيق الصور والقياسات والمقارنة بالمراجع</small></span><em>المرحلة التالية</em></div>
@@ -252,6 +282,6 @@
   <script src="subscriptions.js"></script>
   <script src="sharing.js"></script>
   <script src="app.js"></script>
-  <script src="wallet.js"></script>
+  <script src="wallet.js"></script>\n  <script src="research-analysis.js"></script>
 </body>
 </html>
