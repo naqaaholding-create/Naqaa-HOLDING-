@@ -70,3 +70,25 @@ def test_duplicate_email_and_invalid_login_are_rejected():
 def test_protected_usage_requires_token():
     assert client.get("/me/usage").status_code == 401
     assert client.post("/usage/consume", json={"action": "site"}).status_code == 401
+
+def test_payment_status_stays_disabled_even_if_readiness_values_exist(monkeypatch):
+    monkeypatch.setenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "T_TEST_ONLY_NOT_A_REAL_ADDRESS")
+    monkeypatch.setenv("TRONGRID_API_KEY", "test-only-not-a-real-key")
+    response = client.get("/payments/status")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["payments_enabled"] is False
+    assert body["withdrawals_enabled"] is False
+    assert body["receive_address_configured"] is True
+    assert body["chain_provider_configured"] is True
+
+
+def test_consume_rejects_unknown_action():
+    token = register()
+    response = client.post(
+        "/usage/consume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"action": "payment"},
+    )
+    assert response.status_code == 422
+
