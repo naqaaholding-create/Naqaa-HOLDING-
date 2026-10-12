@@ -175,6 +175,25 @@ def health() -> dict:
 def list_plans() -> dict:
     return {"plans": PLANS, "payments_enabled": False, "note": "الأسعار والحدود مقترحة؛ لا يمكن شراء أو تفعيل الباقات المدفوعة من هذه الواجهة."}
 
+@app.get("/payments/status")
+def payment_status() -> dict:
+    """Expose readiness only; this endpoint never accepts money or activates subscriptions."""
+    receive_address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
+    provider_key = os.getenv("TRONGRID_API_KEY", "").strip()
+    return {
+        "payments_enabled": False,
+        "withdrawals_enabled": False,
+        "network": "TRON",
+        "token": "USDT-TRC20",
+        "receive_address_configured": bool(receive_address),
+        "chain_provider_configured": bool(provider_key),
+        "note": (
+            "الدفع الحقيقي غير مفعّل. يلزم إكمال التحقق من معاملات TRON، وسجل مالي آمن، "
+            "ومراجعة إدارية للسحب، واختبارات أمنية قبل استقبال أموال حقيقية."
+        ),
+    }
+
+
 
 @app.post("/auth/register", response_model=TokenOutput, status_code=201)
 def register(payload: RegisterInput, db: Session = Depends(get_db)) -> TokenOutput:
