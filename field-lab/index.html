@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="subscriptions.css">
   <link rel="stylesheet" href="sharing.css">
   <link rel="stylesheet" href="wallet.css">
-  <link rel="stylesheet" href="research-analysis.css">
+  <link rel="stylesheet" href="research-analysis.css">\n  <link rel="stylesheet" href="terrain-profile.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
@@ -265,6 +265,43 @@
       </form>
     </section>
 
+        <section class="panel terrain-profile-panel" id="terrain-profile">
+      <div class="section-heading">
+        <div><p class="eyebrow">SURFACE & SUBSURFACE PROFILES</p><h2>رسم التضاريس وبيانات ما تحت الأرض</h2></div>
+        <span class="step">07</span>
+      </div>
+      <div class="terrain-note"><strong>حدود القياس:</strong> الرسم الأول يستعمل بيانات ارتفاعات سطح الأرض عبر الإنترنت. أما الرسم الثاني فيعرض قياسات تستوردها من جهاز GPR أو ERT أو مصدر علمي؛ لا يستطيع GPS أو صور الأقمار الصناعية وحدها تأكيد المياه الجوفية أو الفراغات أو الدفائن.</div>
+      <section class="terrain-subsection">
+        <h3>١. المقطع الطبوغرافي فوق سطح الأرض</h3>
+        <p class="helper">حدّد الموقع في النموذج الأساسي أولًا. اختر طول المقطع واتجاهه؛ تُجلب 25 عينة ارتفاع تقريبية من خدمة Open-Meteo.</p>
+        <div class="terrain-controls">
+          <div><label for="terrain-distance">طول المقطع (متر)</label><input id="terrain-distance" type="number" min="100" max="5000" step="100" value="1000"></div>
+          <div><label for="terrain-bearing">الاتجاه (درجة من الشمال)</label><input id="terrain-bearing" type="number" min="0" max="359" step="1" value="90"></div>
+          <button id="terrain-generate" class="button button-primary" type="button">إنشاء رسم الارتفاعات</button>
+        </div>
+        <p id="terrain-status" class="terrain-status" role="status" aria-live="polite">لم يتم طلب بيانات الارتفاعات بعد.</p>
+        <div id="terrain-chart-wrap" class="terrain-chart-wrap" hidden>
+          <svg id="terrain-chart" class="terrain-chart" viewBox="0 0 760 300" role="img" aria-label="رسم ارتفاع التضاريس على طول المقطع"></svg>
+          <p id="terrain-stats" class="terrain-stats"></p>
+          <div class="terrain-actions"><button id="terrain-download" class="button button-secondary" type="button" disabled>تنزيل بيانات المقطع JSON</button></div>
+          <p class="helper">المصدر: Open-Meteo Elevation API. الدقة تتأثر بدقة نموذج الارتفاعات المتاح، وقد لا تمثل التفاصيل الصغيرة على الأرض.</p>
+        </div>
+      </section>
+      <section class="terrain-subsection">
+        <h3>٢. مقطع تحت سطح الأرض من بيانات جهاز</h3>
+        <p>استورد ملف CSV صادرًا من جهاز مسح أو برنامج مختص. ستُرسم القيم مقابل المسافة والعمق دون اختلاق تفسير جيولوجي.</p>
+        <label for="underground-file">ملف القياسات CSV (حد أقصى 5 ميغابايت)</label>
+        <input id="underground-file" class="terrain-file" type="file" accept=".csv,text/csv">
+        <p class="terrain-csv-example">يجب أن يحتوي الملف على عناوين الأعمدة: <code>distance_m,depth_m,value</code> ثم صف لكل قراءة. القيم هي قياسات جهازك كما هي.</p>
+        <p id="underground-status" class="terrain-status" role="status" aria-live="polite">لم يتم استيراد بيانات تحت السطح.</p>
+        <div id="underground-chart-wrap" class="terrain-chart-wrap" hidden>
+          <svg id="underground-chart" class="terrain-chart terrain-underground-chart" viewBox="0 0 760 330" role="img" aria-label="عرض لوني لبيانات القياس المستوردة حسب المسافة والعمق"></svg>
+          <p id="underground-stats" class="terrain-stats"></p>
+          <div class="terrain-actions"><button id="underground-download" class="button button-secondary" type="button" disabled>تنزيل بيانات المسح JSON</button></div>
+        </div>
+      </section>
+      <div class="terrain-note"><strong>المياه الجوفية والفراغات والدفائن:</strong> قد تساعد القياسات الجيوفيزيائية على تحديد شذوذات تستحق الفحص، لكنها لا تثبت وحدها نوع الهدف. يلزم معرفة الجهاز والمعايرة والجيولوجيا المحلية ومراجعة مختص، كما يجب احترام القوانين وحماية المواقع الأثرية.</div>
+    </section>
     <section class="panel roadmap">
       <div><p class="eyebrow">NEXT ANALYSIS MODULES</p><h2>مسارات التطوير العلمي</h2><p>هذه النسخة تبدأ بالتوثيق المنظم؛ وحدات التحليل المتقدم تُضاف بعد توفير مصادر البيانات والمراجع.</p></div>
       <div class="module-list">
@@ -285,6 +322,6 @@
   <script src="sharing.js"></script>
   <script src="app.js"></script>
   <script src="wallet.js"></script>
-  <script src="research-analysis.js"></script>
+  <script src="research-analysis.js"></script>\n  <script src="terrain-profile.js"></script>
 </body>
 </html>
