@@ -5,8 +5,7 @@
   function init() {
     var form = byId("evidence-report-form");
     if (!form) return;
-    var photoData = "";
-    var photoName = "";
+    var photos = [];
     var input = byId("evidence-photo");
     var preview = byId("evidence-photo-preview");
     var status = byId("evidence-status");
@@ -28,33 +27,37 @@
       window.setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
     }
     input.addEventListener("change", function () {
-      var file = input.files && input.files[0];
-      photoData = "";
-      photoName = "";
+      var files = Array.prototype.slice.call(input.files || []);
+      photos = [];
       preview.textContent = "";
-      if (!file) return;
-      if (!/^image\//.test(file.type)) {
+      if (!files.length) return;
+      if (files.length > 6) {
         input.value = "";
-        setStatus("الملف المختار ليس صورة. اختر ملف صورة فقط.");
+        setStatus("الحد الأقصى 6 صور في عملية توثيق واحدة.");
         return;
       }
-      if (file.size > 12 * 1024 * 1024) {
+      if (files.some(function (file) { return !/^image\\//.test(file.type) || file.size > 12 * 1024 * 1024; })) {
         input.value = "";
-        setStatus("حجم الصورة يتجاوز 12 ميغابايت. اختر صورة أصغر.");
+        setStatus("اختر صورًا فقط، وحجم كل صورة لا يتجاوز 12 ميغابايت.");
         return;
       }
-      var reader = new FileReader();
-      reader.onload = function () {
-        photoData = String(reader.result || "");
-        photoName = file.name || "evidence-image";
-        var image = document.createElement("img");
-        image.src = photoData;
-        image.alt = "معاينة صورة الدليل";
-        preview.appendChild(image);
-        setStatus("أُرفقت الصورة محليًا. لم تُرفع إلى خادم.");
-      };
-      reader.onerror = function () { setStatus("تعذرت قراءة الصورة."); };
-      reader.readAsDataURL(file);
+      Promise.all(files.map(function (file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve({name:file.name || "evidence-image", dataUrl:String(reader.result || "")}); };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      })).then(function (results) {
+        photos = results;
+        results.forEach(function (photo) {
+          var image = document.createElement("img");
+          image.src = photo.dataUrl;
+          image.alt = photo.name;
+          preview.appendChild(image);
+        });
+        setStatus("تم تجهيز " + photos.length + " صور على الجهاز. لم تُرفع إلى خادم.");
+      }).catch(function () { setStatus("تعذرت قراءة إحدى الصور."); });
     });
 
     var copyLocation = byId("copy-current-location");
@@ -99,7 +102,7 @@
         alternativeExplanations: byId("evidence-alternatives").value.trim(),
         measurements: byId("evidence-measurements").value.trim(),
         confidence: byId("evidence-confidence").value,
-        photo: photoData ? { name: photoName, dataUrl: photoData } : null,
+        photos: photos,
         interpretationStatus: "user_observation_not_verified",
         limitations: [
           "هذا التقرير يوثق ملاحظات المستخدم ولا يمثل كشفًا آليًا أو إثباتًا لوجود دفائن أو آثار.",
@@ -112,7 +115,7 @@
         "درجة التقييم المسجلة: " + byId("evidence-confidence").selectedOptions[0].textContent +
         ". هذه الدرجة تصف ملاحظة المستخدم وليست احتمالًا علميًا محسوبًا.";
       byId("download-evidence-report").disabled = false;
-      setStatus("تم تجهيز التقرير على هذا الجهاز فقط. لم يُرسل إلى الخادم ولم يُجرَ تحليل آلي للصورة.");
+      setStatus("تم تجهيز تقرير التوثيق على هذا الجهاز فقط. لم تُرفع الصور ولم يُجرَ تحليل آلي لها.");
     });
 
     byId("download-evidence-report").addEventListener("click", function () {
@@ -121,8 +124,7 @@
     });
     byId("reset-evidence-report").addEventListener("click", function () {
       form.reset();
-      photoData = "";
-      photoName = "";
+      photos = [];
       report = null;
       preview.textContent = "";
       byId("evidence-report-preview").textContent = "";
