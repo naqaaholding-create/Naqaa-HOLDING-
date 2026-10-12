@@ -162,22 +162,22 @@
 
     <section class="panel wallet-panel" id="internal-wallet">
       <div class="section-heading">
-        <div><p class="eyebrow">INTERNAL WALLET</p><h2>المحفظة الداخلية</h2></div>
+        <div><p class="eyebrow">REAL MONEY — SETUP</p><h2>المحفظة والمدفوعات</h2></div>
         <span class="step">03</span>
       </div>
-      <p class="pricing-intro">محفظة داخل التطبيق للتجربة وقراءة ملخص الحساب فقط. لا تتصل بمحفظة خارجية ولا تنفذ إيداعًا أو سحبًا حقيقيًا.</p>
+      <p class="pricing-intro">إعداد مبدئي لاستقبال USDT على شبكة TRON (TRC20) عبر عنوان الاستقبال العام لمحفظة SafePal. لن يظهر رصيد حقيقي ولن يُفعّل اشتراك إلا بعد التحقق من المعاملة على الخادم.</p>
       <div class="wallet-summary">
-        <div><span>رصيد تجريبي</span><strong id="wallet-balance">0.00 EUR</strong><small>ليس أموالًا حقيقية</small></div>
-        <div><span>حالة المحفظة</span><strong class="wallet-status">محلية / تجريبية</strong><small id="wallet-account">الحساب: لم يتم تسجيل الدخول عبر خادم</small></div>
+        <div><span>الرصيد الحقيقي</span><strong id="wallet-balance">غير متاح</strong><small>لا يوجد رصيد مؤكد متصل حاليًا</small></div>
+        <div><span>حالة الربط</span><strong class="wallet-status" id="wallet-status-label">بانتظار الإعداد</strong><small id="wallet-account">لم يتم ربط خادم مالي آمن</small></div>
       </div>
       <div class="wallet-actions">
-        <button class="button button-primary" id="wallet-add-demo" type="button">إضافة حركة اختبارية</button>
-        <button class="button button-secondary" id="wallet-refresh" type="button">تحديث الحساب</button>
-        <button class="button button-secondary" id="wallet-reset" type="button">إعادة ضبط التجربة</button>
+        <button class="button button-primary" id="wallet-deposit-request" type="button">إعداد الإيداع USDT</button>
+        <button class="button button-secondary" id="wallet-withdraw-request" type="button">طلب سحب</button>
+        <button class="button button-secondary" id="wallet-refresh" type="button">فحص حالة الربط</button>
       </div>
-      <h3>سجل الحركات التجريبية</h3>
-      <div id="wallet-ledger" class="wallet-ledger"><p class="helper">لا توجد حركات حتى الآن.</p></div>
-      <p class="helper" id="wallet-notice" role="status" aria-live="polite">وضع الاختبار: أي حركة تُحفظ على هذا الجهاز فقط، ولا تمثل معاملة مالية أو رصيدًا قابلًا للسحب.</p>
+      <h3>سجل المعاملات</h3>
+      <div id="wallet-ledger" class="wallet-ledger"><p class="helper">لا توجد معاملات حقيقية مؤكدة مرتبطة بالخادم.</p></div>
+      <p class="helper" id="wallet-notice" role="status" aria-live="polite">الدفع والسحب الحقيقيان غير مفعّلين بعد. لا ترسل USDT إلى أي عنوان قبل ظهوره داخل التطبيق والتحقق من الشبكة والمبلغ.</p>
     </section>
 
     <section class="panel pricing-panel" id="subscriptions">
