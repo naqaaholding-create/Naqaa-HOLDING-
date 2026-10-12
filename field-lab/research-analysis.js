@@ -36,7 +36,7 @@
         setStatus("الحد الأقصى 6 صور في عملية توثيق واحدة.");
         return;
       }
-      if (files.some(function (file) { return !/^image\\//.test(file.type) || file.size > 12 * 1024 * 1024; })) {
+      if (files.some(function (file) { return !/^image\//.test(file.type) || file.size > 12 * 1024 * 1024; })) {
         input.value = "";
         setStatus("اختر صورًا فقط، وحجم كل صورة لا يتجاوز 12 ميغابايت.");
         return;
