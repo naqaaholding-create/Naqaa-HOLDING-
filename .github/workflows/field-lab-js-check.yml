@@ -1,0 +1,37 @@
+name: NAQAA Field Lab JavaScript syntax check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "field-lab/**/*.js"
+      - "field-lab/index.html"
+      - ".github/workflows/field-lab-js-check.yml"
+  pull_request:
+    paths:
+      - "field-lab/**/*.js"
+      - "field-lab/index.html"
+      - ".github/workflows/field-lab-js-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check Field Lab JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            node --check "$file"
+          done < <(find field-lab -type f -name '*.js' -print0)
