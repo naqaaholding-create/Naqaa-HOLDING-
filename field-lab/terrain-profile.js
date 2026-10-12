@@ -84,7 +84,7 @@
     var uniqueD=Array.from(new Set(ds)).sort(function(a,b){return a-b;}), uniqueZ=Array.from(new Set(zs)).sort(function(a,b){return a-b;});
     var cw=Math.max(2,pw/Math.max(1,uniqueD.length)), ch=Math.max(2,ph/Math.max(1,uniqueZ.length));
     rows.forEach(function(r){
-      var f=vmax===vmin?.5:(r.value-vmin)/(vmax-vmin);
+      var f = vmax === vmin ? 0.5 : (r.value - vmin) / (vmax - vmin);
       var hue=220-220*f;
       var xx=left+(r.distance-dmin)/(dmax-dmin)*pw-cw/2;
       var yy=top+(r.depth-zmin)/(zmax-zmin)*ph-ch/2;
