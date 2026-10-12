@@ -9,7 +9,7 @@ on:
       - ".github/workflows/build-field-lab-android.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android:
@@ -55,3 +55,17 @@ jobs:
           path: field-lab/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish public Field Lab download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: field-lab-preview-run${{ github.run_number }}
+          name: NAQAA Field Lab Android Preview ${{ github.run_number }}
+          body: |
+            Experimental Android APK for NAQAA Field Lab only.
+            Debug build for device testing; not a store release.
+            This release does not represent real-money payments being enabled.
+          files: field-lab/android/app/build/outputs/apk/debug/app-debug.apk
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
