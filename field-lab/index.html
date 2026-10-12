@@ -82,7 +82,7 @@
             <button id="capture-button" type="button" class="button button-primary" hidden>التقاط الصورة</button>
           </div>
           <label for="photo-input">اختيار صور من الجهاز</label>
-          <input id="photo-input" type="file" accept="image/*" multiple>
+          <input id="photo-input" type="file" accept="image/*" multiple>\n          <p class="helper">حد أقصى 6 صور لكل عملية توثيق أو تحليل.</p>
           <div id="photo-preview" class="photo-preview" aria-live="polite"></div>
 
           <label for="notes">الملاحظات الميدانية</label>
@@ -252,7 +252,7 @@
         </div>
         <button class="button button-secondary button-small" type="button" id="copy-current-location">نسخ إحداثيات النموذج الأساسي</button>
         <label for="evidence-coordinate-note">مصدر الإحداثيات ودقتها</label><input id="evidence-coordinate-note" maxlength="250" placeholder="مثال: GPS الهاتف، دقة ظاهرة 7 أمتار">
-        <label for="evidence-photo">إرفاق صورة دليل (حتى 12 ميغابايت)</label><input id="evidence-photo" type="file" accept="image/*">
+        <label for="evidence-photo">إرفاق صور النقوش أو العلامات (حتى 6 صور، 12 ميغابايت للصورة)</label><input id="evidence-photo" type="file" accept="image/*" multiple>
         <div id="evidence-photo-preview" class="evidence-photo-preview"></div>
         <label for="evidence-description">الوصف المباشر لما تراه *</label><textarea id="evidence-description" required rows="3" maxlength="5000" placeholder="الشكل، الأبعاد التقريبية، الاتجاه، مقياس الصورة، حالة السطح..."></textarea>
         <label for="evidence-hypothesis">تفسير أو فرضية أولية (اختياري)</label><textarea id="evidence-hypothesis" rows="2" maxlength="2500" placeholder="اكتبها كفرضية، لا كحقيقة مؤكدة."></textarea>
@@ -261,7 +261,7 @@
         <label for="evidence-confidence">حالة الملاحظة (ليست درجة ذكاء اصطناعي)</label><select id="evidence-confidence"><option value="unverified">غير متحقق منها</option><option value="needs_expert_review">تحتاج مراجعة مختص</option><option value="supported_by_source">توجد مراجع داعمة مرفقة</option></select>
         <div class="evidence-actions"><button class="button button-primary" type="submit">إعداد تقرير التوثيق</button><button class="button button-secondary" id="download-evidence-report" type="button" disabled>تنزيل التقرير JSON</button><button class="button button-quiet" id="reset-evidence-report" type="button">مسح النموذج</button></div>
         <p id="evidence-report-preview" class="evidence-result" role="status" aria-live="polite"></p>
-        <p id="evidence-status" class="helper evidence-helper" role="status" aria-live="polite">تعمل هذه الوحدة محليًا؛ لا ترفع الصور ولا ترسل الإحداثيات إلى خادم.</p>
+        <p id="evidence-status" class="helper evidence-helper" role="status" aria-live="polite">حاليًا لا يوجد خادم تحليل منشور لهذه الوحدة؛ اختيار الصور لا يرفعها ولا يشغّل تحليلًا سحابيًا حتى يتم ربط خدمة آمنة.</p>
       </form>
     </section>
 
@@ -272,10 +272,10 @@
       </div>
       <div class="terrain-note"><strong>حدود القياس:</strong> الرسم الأول يستعمل بيانات ارتفاعات سطح الأرض عبر الإنترنت. أما الرسم الثاني فيعرض قياسات تستوردها من جهاز GPR أو ERT أو مصدر علمي؛ لا يستطيع GPS أو صور الأقمار الصناعية وحدها تأكيد المياه الجوفية أو الفراغات أو الدفائن.</div>
       <section class="terrain-subsection">
-        <h3>١. المقطع الطبوغرافي فوق سطح الأرض</h3>
-        <p class="helper">حدّد الموقع في النموذج الأساسي أولًا. اختر طول المقطع واتجاهه؛ تُجلب 25 عينة ارتفاع تقريبية من خدمة Open-Meteo.</p>
+        <h3>١. المقطع الطبوغرافي ضمن دائرة قطرها الأقصى 50 مترًا</h3>
+        <p class="helper">حدّد الموقع في النموذج الأساسي أولًا. يبقى المقطع داخل منطقة دائرية مركزها إحداثياتك وقطرها لا يتجاوز 50 مترًا. تُجلب 25 عينة ارتفاع تقريبية من خدمة Open-Meteo.</p>
         <div class="terrain-controls">
-          <div><label for="terrain-distance">طول المقطع (متر)</label><input id="terrain-distance" type="number" min="100" max="5000" step="100" value="1000"></div>
+          <div><label for="terrain-distance">طول المقطع (متر، حد أقصى 50)</label><input id="terrain-distance" type="number" min="5" max="50" step="5" value="50"></div>
           <div><label for="terrain-bearing">الاتجاه (درجة من الشمال)</label><input id="terrain-bearing" type="number" min="0" max="359" step="1" value="90"></div>
           <button id="terrain-generate" class="button button-primary" type="button">إنشاء رسم الارتفاعات</button>
         </div>
@@ -288,11 +288,11 @@
         </div>
       </section>
       <section class="terrain-subsection">
-        <h3>٢. مقطع تحت سطح الأرض من بيانات جهاز</h3>
+        <h3>٢. مقطع تحت سطح الأرض ضمن نطاق الموقع المحدد</h3>
         <p>استورد ملف CSV صادرًا من جهاز مسح أو برنامج مختص. ستُرسم القيم مقابل المسافة والعمق دون اختلاق تفسير جيولوجي.</p>
         <label for="underground-file">ملف القياسات CSV (حد أقصى 5 ميغابايت)</label>
         <input id="underground-file" class="terrain-file" type="file" accept=".csv,text/csv">
-        <p class="terrain-csv-example">يجب أن يحتوي الملف على عناوين الأعمدة: <code>distance_m,depth_m,value</code> ثم صف لكل قراءة. القيم هي قياسات جهازك كما هي.</p>
+        <p class="terrain-csv-example">يجب أن يحتوي الملف على عناوين الأعمدة: <code>distance_m,depth_m,value</code> ثم صف لكل قراءة. تُقبل فقط نقاط المسافة الواقعة ضمن قطر 50 مترًا (0–50 م). القيم هي قياسات جهازك كما هي.</p>
         <p id="underground-status" class="terrain-status" role="status" aria-live="polite">لم يتم استيراد بيانات تحت السطح.</p>
         <div id="underground-chart-wrap" class="terrain-chart-wrap" hidden>
           <svg id="underground-chart" class="terrain-chart terrain-underground-chart" viewBox="0 0 760 330" role="img" aria-label="عرض لوني لبيانات القياس المستوردة حسب المسافة والعمق"></svg>
