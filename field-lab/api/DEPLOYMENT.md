@@ -10,7 +10,9 @@ This API is **not yet production-ready**. Containerizing it does not deploy it, 
 - Set `FIELD_LAB_ALLOWED_ORIGINS` to the exact HTTPS frontend origins.
 - Add managed backups, monitoring, request limits, database migrations, rate limits, email verification, password reset, and audit logging.
 - Keep all secrets in the host's secret/environment settings, never in Git or the Android app.
-- The current account/quota API is not enough to support paid subscriptions. Do not enable payments until ledger, idempotency, subscription activation, reconciliation, and security review are complete.
+- Payment intents and on-chain subscription verification are implemented in the release branch; keep `FIELD_LAB_LIVE_PAYMENTS_ENABLED=0` until the production checklist below passes.
+- Live payments require persistent PostgreSQL, not SQLite or ephemeral storage.
+- The app has no withdrawal feature.
 
 ## Safe TRON testnet verification
 
@@ -35,3 +37,11 @@ Do not assume a mainnet USDT contract exists on Nile. Obtain and independently v
 ## Android signing
 
 The repository workflow `.github/workflows/mobile-android-store-release.yml` requires the GitHub Actions secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Store the original keystore and passwords safely outside GitHub; never commit them or paste them into chat. Run the workflow only after confirming that the keystore is backed up and matches any previously distributed release. The workflow builds an Android App Bundle for Play Store, not a signed universal APK.
+
+
+## Mainnet USDT subscription payments
+
+- Tether lists USDT on TRON (TRC20) and the canonical token contract in its supported-protocols reference: https://tether.to/en/supported-protocols/
+- Runtime variables: `FIELD_LAB_ENV=production`, `FIELD_LAB_LIVE_PAYMENTS_ENABLED=0` (set to `1` only once production checks pass), `FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS` (public address only), `TRONGRID_API_KEY`, `FIELD_LAB_DATABASE_URL` (persistent PostgreSQL), and `FIELD_LAB_ALLOWED_ORIGINS` (the exact HTTPS frontend origin).
+- Each invoice expires after 60 minutes. A plan activates only after an on-chain successful transfer to the configured receiver from the canonical USDT contract with the exact amount and at least 20 confirmations. Transaction IDs cannot be reused.
+- Never put private keys or recovery phrases in the application or repository. Check the SafePal receiving address carefully. The release must stay closed while `/payments/status` returns `payments_enabled: false`.

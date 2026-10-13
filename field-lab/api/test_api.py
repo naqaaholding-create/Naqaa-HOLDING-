@@ -1,6 +1,8 @@
 import os
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 # Isolate tests from any developer database.
 _TEST_DB = Path(tempfile.gettempdir()) / "naqaa_field_lab_api_tests.sqlite3"
@@ -10,6 +12,7 @@ os.environ["FIELD_LAB_ENV"] = "test"
 
 from fastapi.testclient import TestClient
 from main import Base, SessionLocal, app, engine  # noqa: E402
+from payments_live import VerifiedUSDTTransfer, USDT_TRON_CONTRACT  # noqa: E402
 
 client = TestClient(app)
 
@@ -78,9 +81,10 @@ def test_payment_status_stays_disabled_even_if_readiness_values_exist(monkeypatc
     assert response.status_code == 200
     body = response.json()
     assert body["payments_enabled"] is False
-    assert body["withdrawals_enabled"] is False
-    assert body["receive_address_configured"] is True
+    assert "withdrawals_enabled" not in body
+    assert body["receive_address_configured"] is False
     assert body["chain_provider_configured"] is True
+    assert body["persistent_database_configured"] is False
 
 
 def test_consume_rejects_unknown_action():
@@ -92,3 +96,51 @@ def test_consume_rejects_unknown_action():
     )
     assert response.status_code == 422
 
+
+
+def test_subscription_activates_only_after_verified_payment(monkeypatch):
+    # Mock the chain verifier: this test never sends real money or contacts TRON.
+    monkeypatch.setattr("main.payments_enabled", lambda: True)
+    monkeypatch.setenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", USDT_TRON_CONTRACT)
+    token = register()
+    headers = {"Authorization": f"Bearer {token}"}
+    invoice_response = client.post("/payments/intents", headers=headers, json={"plan_code": "daily", "payer_address": USDT_TRON_CONTRACT})
+    assert invoice_response.status_code == 201, invoice_response.text
+    invoice = invoice_response.json()
+    assert invoice["amount_usdt"] == "10"
+    assert invoice["network"] == "TRON (TRC20)"
+    txid = "cd" * 32
+    transfer = VerifiedUSDTTransfer(
+        txid=txid,
+        amount_base_units=10_000_000,
+        block_number=12345,
+        block_timestamp_ms=int(datetime.now(timezone.utc).timestamp() * 1000),
+        confirmations=21,
+    )
+    with patch("main.verify_usdt_transfer", return_value=transfer) as verifier:
+        response = client.post("/payments/verify", headers=headers, json={
+            "intent_id": invoice["intent_id"], "txid": txid,
+        })
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "confirmed"
+    verifier.assert_called_once()
+    usage = client.get("/me/usage", headers=headers).json()
+    assert usage["plan"] == "daily"
+    assert usage["payment_enabled"] is True
+
+    second_invoice = client.post("/payments/intents", headers=headers, json={"plan_code": "daily", "payer_address": USDT_TRON_CONTRACT})
+    assert second_invoice.status_code == 201, second_invoice.text
+    duplicate = client.post("/payments/verify", headers=headers, json={
+        "intent_id": second_invoice.json()["intent_id"], "txid": txid,
+    })
+    assert duplicate.status_code == 409
+
+
+def test_usage_request_id_is_idempotent():
+    token = register()
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {"action": "site", "request_id": "NQ-ONCE-0001"}
+    first = client.post("/usage/consume", headers=headers, json=payload)
+    second = client.post("/usage/consume", headers=headers, json=payload)
+    assert first.status_code == second.status_code == 200
+    assert first.json()["sites_used"] == second.json()["sites_used"] == 1
