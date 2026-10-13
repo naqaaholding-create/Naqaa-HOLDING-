@@ -21,7 +21,10 @@ jobs:
           test -f field-lab/index.html
           mkdir -p static/field-lab
           cp -a field-lab/. static/field-lab/
-      - uses: actions/configure-pages@v5
+      - name: Configure GitHub Pages for this repository
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./static
