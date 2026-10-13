@@ -1,0 +1,128 @@
+name: Build NAQAA Field Lab Signed Android Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: field-lab
+    steps:
+      - name: Require Android release signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || (echo "::error::Missing ANDROID_KEYSTORE_BASE64 repository secret"; exit 1)
+          test -n "$KEYSTORE_PASSWORD" || (echo "::error::Missing ANDROID_KEYSTORE_PASSWORD repository secret"; exit 1)
+          test -n "$KEY_ALIAS" || (echo "::error::Missing ANDROID_KEY_ALIAS repository secret"; exit 1)
+          test -n "$KEY_PASSWORD" || (echo "::error::Missing ANDROID_KEY_PASSWORD repository secret"; exit 1)
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: field-lab/package.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Install Capacitor dependencies
+        run: npm install
+
+      - name: Prepare web assets
+        run: mkdir -p www && cp *.html *.css *.js www/
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync app assets
+        run: npx cap sync android
+
+      - name: Configure release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/release-keystore.jks
+          cat > android/keystore.properties <<EOF
+          storeFile=release-keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle")
+          if not p.exists():
+              raise SystemExit("Expected Android Gradle file android/app/build.gradle was not generated")
+          s = p.read_text()
+          if "signingConfigs" in s and "release" in s:
+              raise SystemExit("Release signing configuration already exists; inspect the Gradle file before changing it.")
+          snippet = '''
+          def keystoreProperties = new Properties()
+          def keystorePropertiesFile = rootProject.file("keystore.properties")
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+          }
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file(keystoreProperties['storeFile'])
+                      storePassword keystoreProperties['storePassword']
+                      keyAlias keystoreProperties['keyAlias']
+                      keyPassword keystoreProperties['keyPassword']
+                  }
+              }
+          }
+          '''
+          if not s.lstrip().startswith("apply plugin") and "plugins {" not in s:
+              raise SystemExit("Unrecognized Gradle format; refusing to patch signing config automatically.")
+          if "android {" not in s:
+              raise SystemExit("No android block found in Gradle file.")
+          s = s.replace("android {", snippet + "\nandroid {", 1)
+          s = s.replace("buildTypes {", "buildTypes {\n        release { signingConfig signingConfigs.release }", 1)
+          p.write_text(s)
+          PY
+
+      - name: Build signed release APK
+        working-directory: field-lab/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+          test -s app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: naqaa-field-lab-signed-release-apk
+          path: field-lab/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove signing material
+        if: always()
+        working-directory: field-lab
+        run: rm -f android/release-keystore.jks android/keystore.properties
