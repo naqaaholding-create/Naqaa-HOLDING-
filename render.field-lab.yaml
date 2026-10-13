@@ -23,7 +23,7 @@ services:
           name: naqaa-field-lab-db
           property: connectionString
       - key: FIELD_LAB_ALLOWED_ORIGINS
-        value: https://naqaaholding-create.github.io
+        value: https://naqaaholding-create.github.io,https://localhost,capacitor://localhost
       - key: FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS
         sync: false
       - key: TRONGRID_API_KEY
