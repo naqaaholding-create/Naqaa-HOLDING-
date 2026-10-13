@@ -86,7 +86,7 @@ jobs:
           p = Path("app/build.gradle")
           source = p.read_text(encoding="utf-8")
           replacements = [
-              (r"versionCode\\s+\\d+", f'versionCode {os.environ["VERSION_CODE"]}'),
+              (r"versionCode\s+\d+", f'versionCode {os.environ["VERSION_CODE"]}'),
               (r'versionName\\s+"[^"]*"', f'versionName "{os.environ["VERSION_NAME"]}"'),
           ]
           for pattern, value in replacements:
@@ -111,15 +111,15 @@ jobs:
               }
           """, 1)
           if "signingConfig signingConfigs.release" not in source:
-              match = re.search(r"buildTypes\\s*\\{\\s*release\\s*\\{", source)
+              match = re.search(r"buildTypes\s*\{\s*release\s*\{", source)
               if not match:
                   raise SystemExit("Could not locate Android release build type")
               insert_at = match.end()
-              source = source[:insert_at] + "\\n            signingConfig signingConfigs.release" + source[insert_at:]
+              source = source[:insert_at] + "\n            signingConfig signingConfigs.release" + source[insert_at:]
           p.write_text(prefix + source, encoding="utf-8")
 
           def prop(v):
-              return v.replace("\\\\", "\\\\\\\\").replace("\\n", "\\\\n").replace("\\r", "\\\\r").replace(":", "\\\\:").replace("=", "\\\\=").replace("#", "\\\\#").replace("!", "\\\\!")
+              return v.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace(":", "\\\\:").replace("=", "\\\\=").replace("#", "\\\\#").replace("!", "\\\\!")
           values = {
               "storeFile": os.environ["KEYSTORE_FILE"],
               "storePassword": os.environ["STORE_PASSWORD"],
@@ -127,7 +127,7 @@ jobs:
               "keyPassword": os.environ["KEY_PASSWORD"],
           }
           Path("keystore.properties").write_text(
-              "".join(f"{k}={prop(v)}\\n" for k, v in values.items()),
+              "".join(f"{k}={prop(v)}\n" for k, v in values.items()),
               encoding="utf-8",
           )
           PY
