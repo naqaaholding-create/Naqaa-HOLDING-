@@ -44,5 +44,5 @@ jobs:
           print("API health OK; live payments remain disabled")
           PY
           curl --fail --silent http://127.0.0.1:8000/field-lab/ | grep -q "مختبر نقاء"
-          curl --fail --silent http://127.0.0.1:8000/api-config.js | grep -q "FIELD_LAB_API_BASE"
+          curl --fail --silent http://127.0.0.1:8000/field-lab/api-config.js | grep -q "FIELD_LAB_API_BASE"
           echo "Field Lab frontend assets served from the API container"
