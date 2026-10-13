@@ -165,22 +165,42 @@
 
     <section class="panel wallet-panel" id="internal-wallet">
       <div class="section-heading">
-        <div><p class="eyebrow">REAL MONEY — SETUP</p><h2>المحفظة والمدفوعات</h2></div>
+        <div><p class="eyebrow">SECURE CHECKOUT</p><h2>الدفع والاشتراكات</h2></div>
         <span class="step">03</span>
       </div>
-      <p class="pricing-intro">إعداد مبدئي لاستقبال USDT على شبكة TRON (TRC20) عبر عنوان الاستقبال العام لمحفظة SafePal. لن يظهر رصيد حقيقي ولن يُفعّل اشتراك إلا بعد التحقق من المعاملة على الخادم.</p>
+      <p class="pricing-intro">شراء الباقات يتم بعملة USDT على شبكة TRON (TRC20). لا يبدأ الدفع حتى يعلن الخادم جاهزيته، ولا يتفعّل الاشتراك إلا بعد تحقق الخادم من المعاملة والمبلغ والعنوان وعدد التأكيدات.</p>
       <div class="wallet-summary">
-        <div><span>الرصيد الحقيقي</span><strong id="wallet-balance">غير متاح</strong><small>لا يوجد رصيد مؤكد متصل حاليًا</small></div>
-        <div><span>حالة الربط</span><strong class="wallet-status" id="wallet-status-label">بانتظار الإعداد</strong><small id="wallet-account">لم يتم ربط خادم مالي آمن</small></div>
+        <div><span>حالة الدفع</span><strong id="wallet-balance">غير مؤكدة</strong><small>لا يُعرض نجاح دفع دون تحقق الخادم</small></div>
+        <div><span>حالة الاتصال</span><strong class="wallet-status" id="wallet-status-label">جارٍ الفحص</strong><small id="wallet-account">فحص إعداد الخادم المالي</small></div>
+      </div>
+      <div class="checkout-form">
+        <label for="payment-plan">اختر الباقة</label>
+        <select id="payment-plan">
+          <option value="daily">الاشتراك اليومي — 10 USDT</option>
+          <option value="weekly">الاشتراك الأسبوعي — 50 USDT</option>
+          <option value="monthly">الاشتراك الشهري — 100 USDT</option>
+        </select>
+        <button class="button button-primary button-full" id="wallet-deposit-request" type="button">إنشاء طلب دفع آمن</button>
+      </div>
+      <div id="payment-instructions" class="payment-instructions" hidden>
+        <h3>تعليمات الدفع</h3>
+        <p>أرسل المبلغ المحدد فقط إلى العنوان المعروض وعلى شبكة TRON (TRC20). إرسال المبلغ أو الشبكة الخطأ قد يؤدي إلى فقدان الأموال.</p>
+        <div class="payment-value"><span>المبلغ المطلوب</span><strong id="payment-amount">—</strong></div>
+        <label for="payment-receiving-address">عنوان الاستقبال</label>
+        <textarea id="payment-receiving-address" rows="2" readonly></textarea>
+        <button class="button button-secondary button-full" id="wallet-copy-address" type="button">نسخ عنوان الاستقبال</button>
+        <p class="helper" id="payment-expiry"></p>
+        <label for="payment-txid">معرّف المعاملة (Transaction ID)</label>
+        <input id="payment-txid" inputmode="text" autocomplete="off" maxlength="64" placeholder="64 خانة سداسية عشرية">
+        <button class="button button-primary button-full" id="wallet-verify-payment" type="button">التحقق من المعاملة وتفعيل الاشتراك</button>
       </div>
       <div class="wallet-actions">
-        <button class="button button-primary" id="wallet-deposit-request" type="button">إعداد الإيداع USDT</button>
-        <button class="button button-secondary" id="wallet-withdraw-request" type="button">طلب سحب</button>
-        <button class="button button-secondary" id="wallet-refresh" type="button">فحص حالة الربط</button>
+        <button class="button button-secondary" id="wallet-refresh" type="button">فحص حالة الدفع</button>
+        <button class="button button-secondary" id="wallet-history" type="button">تحديث سجل المعاملات</button>
       </div>
-      <h3>سجل المعاملات</h3>
-      <div id="wallet-ledger" class="wallet-ledger"><p class="helper">لا توجد معاملات حقيقية مؤكدة مرتبطة بالخادم.</p></div>
-      <p class="helper" id="wallet-notice" role="status" aria-live="polite">الدفع والسحب الحقيقيان غير مفعّلين بعد. لا ترسل USDT إلى أي عنوان قبل ظهوره داخل التطبيق والتحقق من الشبكة والمبلغ.</p>
+      <h3>سجل معاملات الدفع</h3>
+      <div id="wallet-ledger" class="wallet-ledger"><p class="helper">لا توجد معاملات مرتبطة بهذا الحساب بعد.</p></div>
+      <p class="helper" id="wallet-notice" role="status" aria-live="polite">لا ترسل USDT قبل إنشاء طلب دفع صالح داخل التطبيق والتأكد من الشبكة والمبلغ والعنوان.</p>
     </section>
 
     <section class="panel pricing-panel" id="subscriptions">
@@ -188,7 +208,7 @@
         <div><p class="eyebrow">PLANS & ACCESS</p><h2>باقات مختبر نقاء</h2></div>
         <span class="step">04</span>
       </div>
-      <p class="pricing-intro">اختر الباقة المناسبة لحجم عملك الميداني. الأسعار والحدود أدناه مقترحة للنسخة التجريبية، ولا يوجد تحصيل مالي أو تفعيل اشتراك إلكتروني حتى الآن.</p>
+      <p class="pricing-intro">اختر الباقة المناسبة لحجم عملك الميداني. تُفعّل الباقة المدفوعة فقط بعد تحقق الخادم من معاملة USDT الصحيحة.</p>
       <div class="plans-grid">
         <article class="plan-card plan-trial">
           <span class="plan-label">للتجربة</span><h3>التجربة المجانية</h3><p class="plan-price">$0 <small>/ مجانًا</small></p>
