@@ -4,18 +4,25 @@ Payment processing is intentionally not implemented; paid plans cannot be self-a
 from __future__ import annotations
 
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Generator
+from typing import Generator, Literal
 
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from pwdlib import PasswordHash
-from sqlalchemy import DateTime, ForeignKey, Integer, String, create_engine, select
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from payments_live import PaymentVerificationError, address_to_hex20, verify_usdt_transfer
 
 DATABASE_URL = os.getenv("FIELD_LAB_DATABASE_URL", "sqlite:///./field_lab.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgres://"):]
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgresql://"):]
 JWT_SECRET = os.getenv("FIELD_LAB_JWT_SECRET")
 TOKEN_HOURS = int(os.getenv("FIELD_LAB_TOKEN_HOURS", "12"))
 password_hash = PasswordHash.recommended()
@@ -46,6 +53,30 @@ class User(Base):
     sites_used: Mapped[int] = mapped_column(Integer, default=0)
     questions_used: Mapped[int] = mapped_column(Integer, default=0)
     usage_window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class UsageReceipt(Base):
+    __tablename__ = "field_lab_usage_receipts"
+    __table_args__ = (UniqueConstraint("user_id", "action", "request_id", name="uq_usage_request_per_user"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("field_lab_users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(20))
+    request_id: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PaymentIntent(Base):
+    __tablename__ = "field_lab_payment_intents"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("field_lab_users.id"), index=True)
+    plan_code: Mapped[str] = mapped_column(String(20))
+    amount_base_units: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    txid: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
+    tx_block_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 Base.metadata.create_all(bind=engine)
@@ -99,6 +130,7 @@ class UsageOutput(BaseModel):
 
 class ConsumeInput(BaseModel):
     action: str = Field(pattern="^(site|question)$")
+    request_id: str | None = Field(default=None, min_length=8, max_length=100, pattern="^[A-Za-z0-9_-]+$")
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -163,35 +195,207 @@ def usage_for(user: User) -> UsageOutput:
         sites_used=user.sites_used, sites_limit=plan["sites"],
         questions_used=user.questions_used, questions_limit=plan["questions"],
         expires_at=expires,
+        payment_enabled=payments_enabled(),
     )
+
+
+def payment_configuration_problems() -> list[str]:
+    """Fail closed unless all production settings are valid."""
+    problems: list[str] = []
+    if os.getenv("FIELD_LAB_ENV", "development").lower() != "production":
+        problems.append("FIELD_LAB_ENV must be production")
+    if os.getenv("FIELD_LAB_LIVE_PAYMENTS_ENABLED", "0").strip() != "1":
+        problems.append("FIELD_LAB_LIVE_PAYMENTS_ENABLED is not enabled")
+    receive_address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
+    try:
+        address_to_hex20(receive_address)
+    except PaymentVerificationError:
+        problems.append("A valid TRON mainnet receiving address is not configured")
+    if not os.getenv("TRONGRID_API_KEY", "").strip():
+        problems.append("TRONGRID_API_KEY is not configured")
+    if not DATABASE_URL.startswith(("postgresql+psycopg://", "postgresql://", "postgres://")):
+        problems.append("Persistent PostgreSQL is required for live payments")
+    if not any(origin.lower().startswith("https://") for origin in allowed_origins):
+        problems.append("At least one HTTPS frontend origin must be configured")
+    return problems
+
+
+def payments_enabled() -> bool:
+    return not payment_configuration_problems()
+
+
+def format_usdt(amount_base_units: int) -> str:
+    return f"{amount_base_units / 1_000_000:.6f}".rstrip("0").rstrip(".")
+
+
+def utc_aware(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def payment_intent_output(intent: PaymentIntent, receive_address: str) -> dict:
+    return {
+        "intent_id": intent.id,
+        "plan_code": intent.plan_code,
+        "plan_label": PLANS[intent.plan_code]["label"],
+        "amount_usdt": format_usdt(intent.amount_base_units),
+        "currency": "USDT",
+        "network": "TRON (TRC20)",
+        "receive_address": receive_address,
+        "status": intent.status,
+        "created_at": intent.created_at,
+        "expires_at": intent.expires_at,
+        "confirmation_requirement": max(20, int(os.getenv("FIELD_LAB_TRON_MIN_CONFIRMATIONS", "20"))),
+    }
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "naqaa-field-lab-api", "payments_enabled": False}
+    return {"status": "ok", "service": "naqaa-field-lab-api", "payments_enabled": payments_enabled()}
 
 
 @app.get("/plans")
 def list_plans() -> dict:
-    return {"plans": PLANS, "payments_enabled": False, "note": "الأسعار والحدود مقترحة؛ لا يمكن شراء أو تفعيل الباقات المدفوعة من هذه الواجهة."}
+    return {"plans": PLANS, "currency": "USD", "payments_enabled": payments_enabled(),
+            "note": "لا يُفعّل أي اشتراك مدفوع إلا بعد تأكيد التحويل على الشبكة من الخادم."}
+
 
 @app.get("/payments/status")
 def payment_status() -> dict:
-    """Expose readiness only; this endpoint never accepts money or activates subscriptions."""
+    problems = payment_configuration_problems()
     receive_address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
-    provider_key = os.getenv("TRONGRID_API_KEY", "").strip()
+    try:
+        address_to_hex20(receive_address)
+        address_valid = True
+    except PaymentVerificationError:
+        address_valid = False
     return {
-        "payments_enabled": False,
-        "withdrawals_enabled": False,
+        "payments_enabled": not problems,
         "network": "TRON",
         "token": "USDT-TRC20",
-        "receive_address_configured": bool(receive_address),
-        "chain_provider_configured": bool(provider_key),
-        "note": (
-            "الدفع الحقيقي غير مفعّل. يلزم إكمال التحقق من معاملات TRON، وسجل مالي آمن، "
-            "ومراجعة إدارية للسحب، واختبارات أمنية قبل استقبال أموال حقيقية."
-        ),
+        "receive_address_configured": address_valid,
+        "chain_provider_configured": bool(os.getenv("TRONGRID_API_KEY", "").strip()),
+        "persistent_database_configured": DATABASE_URL.startswith(("postgresql+psycopg://", "postgresql://", "postgres://")),
+        "receive_address": receive_address if not problems else None,
+        "requirements_remaining": problems,
+        "note": ("الدفع متاح. أنشئ طلبًا من التطبيق قبل التحويل." if not problems else
+                 "الدفع مغلق حتى اكتمال إعداد الإنتاج: " + "؛ ".join(problems)),
     }
+
+
+class CreatePaymentIntentInput(BaseModel):
+    plan_code: Literal["daily", "weekly", "monthly"]
+
+
+class VerifyPaymentInput(BaseModel):
+    intent_id: str = Field(min_length=36, max_length=36)
+    txid: str = Field(pattern="^[0-9a-fA-F]{64}$")
+
+
+@app.post("/payments/intents", status_code=201)
+def create_payment_intent(payload: CreatePaymentIntentInput, user: User = Depends(current_user),
+                          db: Session = Depends(get_db)) -> dict:
+    if not payments_enabled():
+        raise HTTPException(status_code=503, detail="الدفع الحقيقي غير جاهز بعد. لم يتم إنشاء طلب دفع.")
+    current_plan = active_plan(user)
+    if current_plan != "free" and current_plan != payload.plan_code:
+        raise HTTPException(status_code=409, detail="لديك اشتراك مدفوع نشط؛ جدّد الباقة نفسها أو انتظر انتهاءها.")
+    now = datetime.now(timezone.utc)
+    existing = db.scalar(select(PaymentIntent).where(
+        PaymentIntent.user_id == user.id,
+        PaymentIntent.plan_code == payload.plan_code,
+        PaymentIntent.status == "pending",
+        PaymentIntent.expires_at > now,
+    ).order_by(PaymentIntent.created_at.desc()))
+    receive_address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
+    if existing:
+        return payment_intent_output(existing, receive_address)
+    intent = PaymentIntent(
+        id=str(uuid.uuid4()), user_id=user.id, plan_code=payload.plan_code,
+        amount_base_units=int(PLANS[payload.plan_code]["price_usd"]) * 1_000_000,
+        created_at=now, expires_at=now + timedelta(minutes=60), status="pending",
+    )
+    db.add(intent)
+    db.commit()
+    db.refresh(intent)
+    return payment_intent_output(intent, receive_address)
+
+
+@app.post("/payments/verify")
+def verify_payment(payload: VerifyPaymentInput, user: User = Depends(current_user),
+                   db: Session = Depends(get_db)) -> dict:
+    if not payments_enabled():
+        raise HTTPException(status_code=503, detail="التحقق من الدفع غير متاح الآن.")
+    intent = db.scalar(select(PaymentIntent).where(PaymentIntent.id == payload.intent_id).with_for_update())
+    if not intent or intent.user_id != user.id:
+        raise HTTPException(status_code=404, detail="طلب الدفع غير موجود لهذا الحساب.")
+    user = db.scalar(select(User).where(User.id == user.id).with_for_update().execution_options(populate_existing=True))
+    txid = payload.txid.lower()
+    if intent.status == "paid":
+        if intent.txid == txid:
+            return {"status": "confirmed", "already_processed": True, "plan": intent.plan_code,
+                    "expires_at": user.plan_expires_at}
+        raise HTTPException(status_code=409, detail="تم تأكيد طلب الدفع بمعاملة أخرى.")
+    if intent.status != "pending":
+        raise HTTPException(status_code=409, detail="طلب الدفع لم يعد نشطًا.")
+    now = datetime.now(timezone.utc)
+    if utc_aware(intent.expires_at) <= now:
+        intent.status = "expired"
+        db.commit()
+        raise HTTPException(status_code=410, detail="انتهت صلاحية طلب الدفع؛ أنشئ طلبًا جديدًا.")
+    if db.scalar(select(PaymentIntent.id).where(PaymentIntent.txid == txid)) is not None:
+        raise HTTPException(status_code=409, detail="هذه المعاملة استُخدمت سابقًا ولا يمكن اعتمادها مجددًا.")
+    current_plan = active_plan(user)
+    if current_plan != "free" and current_plan != intent.plan_code:
+        raise HTTPException(status_code=409, detail="الباقة النشطة تغيرت منذ إنشاء طلب الدفع.")
+    created_ms = int(utc_aware(intent.created_at).timestamp() * 1000)
+    expires_ms = int(utc_aware(intent.expires_at).timestamp() * 1000)
+    try:
+        transfer = verify_usdt_transfer(
+            txid, receiving_address=os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip(),
+            expected_amount_base_units=intent.amount_base_units,
+            api_key=os.getenv("TRONGRID_API_KEY", "").strip(),
+            min_confirmations=max(20, int(os.getenv("FIELD_LAB_TRON_MIN_CONFIRMATIONS", "20"))),
+            earliest_timestamp_ms=created_ms - 30_000, latest_timestamp_ms=expires_ms,
+        )
+    except PaymentVerificationError as exc:
+        raise HTTPException(status_code=422, detail="لم يتم اعتماد الدفع: " + str(exc)) from exc
+    if current_plan == intent.plan_code and user.plan_expires_at:
+        start_at = max(now, utc_aware(user.plan_expires_at))
+    else:
+        start_at = now
+    user.plan = intent.plan_code
+    user.plan_expires_at = start_at + timedelta(days=int(PLANS[intent.plan_code]["duration_days"]))
+    user.sites_used = 0
+    user.questions_used = 0
+    user.usage_window_started_at = now
+    intent.status = "paid"
+    intent.txid = txid
+    intent.tx_block_number = transfer.block_number
+    intent.confirmed_at = now
+    try:
+        db.add(user)
+        db.add(intent)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="تعذر اعتماد المعاملة لأنها سُجلت بالفعل؛ تحقق من الاشتراك قبل إعادة المحاولة.") from exc
+    db.refresh(user)
+    db.refresh(intent)
+    return {"status": "confirmed", "already_processed": False, "txid": txid, "plan": user.plan,
+            "plan_label": PLANS[user.plan]["label"], "expires_at": user.plan_expires_at,
+            "confirmations": transfer.confirmations, "message": "تم التحقق من التحويل على شبكة TRON وتفعيل الاشتراك."}
+
+
+@app.get("/payments/history")
+def payment_history(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    intents = db.scalars(select(PaymentIntent).where(PaymentIntent.user_id == user.id)
+                         .order_by(PaymentIntent.created_at.desc()).limit(50)).all()
+    return {"transactions": [
+        {"intent_id": p.id, "plan_code": p.plan_code, "plan_label": PLANS[p.plan_code]["label"],
+         "amount_usdt": format_usdt(p.amount_base_units), "status": p.status, "txid": p.txid,
+         "created_at": p.created_at, "confirmed_at": p.confirmed_at, "expires_at": p.expires_at}
+        for p in intents
+    ]}
 
 
 
@@ -231,6 +435,17 @@ def get_usage(user: User = Depends(current_user), db: Session = Depends(get_db))
 def consume(payload: ConsumeInput, user: User = Depends(current_user), db: Session = Depends(get_db)) -> UsageOutput:
     plan_name = active_plan(user)
     refresh_window_if_needed(user, plan_name)
+    if payload.request_id:
+        previous = db.scalar(select(UsageReceipt).where(
+            UsageReceipt.user_id == user.id,
+            UsageReceipt.action == payload.action,
+            UsageReceipt.request_id == payload.request_id,
+        ))
+        if previous:
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            return usage_for(user)
     plan = PLANS[plan_name]
     if payload.action == "site":
         if user.sites_used >= plan["sites"]:
@@ -243,7 +458,21 @@ def consume(payload: ConsumeInput, user: User = Depends(current_user), db: Sessi
             raise HTTPException(status_code=429, detail="انتهت حصة الاستفسارات لهذه الباقة")
         user.questions_used += 1
     db.add(user)
-    db.commit()
+    if payload.request_id:
+        db.add(UsageReceipt(user_id=user.id, action=payload.action, request_id=payload.request_id))
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        previous = db.scalar(select(UsageReceipt.id).where(
+            UsageReceipt.user_id == user.id,
+            UsageReceipt.action == payload.action,
+            UsageReceipt.request_id == payload.request_id,
+        )) if payload.request_id else None
+        if previous:
+            refreshed = db.get(User, user.id)
+            return usage_for(refreshed)
+        raise HTTPException(status_code=409, detail="تعذّر تثبيت عملية الحصة؛ أعد المحاولة بنفس معرّف الطلب.") from exc
     db.refresh(user)
     return usage_for(user)
 
