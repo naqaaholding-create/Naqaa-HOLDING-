@@ -1,0 +1,41 @@
+# Dedicated production blueprint for NAQAA Field Lab API.
+# Select this file as the Blueprint path in Render.
+# Live payments intentionally remain disabled until the receiving address/provider are verified.
+services:
+  - type: web
+    name: naqaa-field-lab-api
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./field-lab/api/Dockerfile
+    dockerContext: ./field-lab/api
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: FIELD_LAB_ENV
+        value: production
+      - key: FIELD_LAB_LIVE_PAYMENTS_ENABLED
+        value: "0"
+      - key: FIELD_LAB_JWT_SECRET
+        generateValue: true
+      - key: FIELD_LAB_DATABASE_URL
+        fromDatabase:
+          name: naqaa-field-lab-db
+          property: connectionString
+      - key: FIELD_LAB_ALLOWED_ORIGINS
+        value: https://naqaaholding-create.github.io
+      - key: FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS
+        sync: false
+      - key: TRONGRID_API_KEY
+        sync: false
+      - key: FIELD_LAB_TRON_MIN_CONFIRMATIONS
+        value: "20"
+
+databases:
+  - name: naqaa-field-lab-db
+    databaseName: naqaa_field_lab
+    user: naqaa_field_lab
+    region: frankfurt
+    plan: basic-256mb
+    postgresMajorVersion: "18"
+    ipAllowList: []
