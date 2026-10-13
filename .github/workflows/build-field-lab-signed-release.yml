@@ -86,7 +86,7 @@ jobs:
           s = p.read_text()
           if "signingConfigs {" in s:
               raise SystemExit("Signing config already exists; refusing to patch twice.")
-          if not re.search(r"android\\s*\\{", s):
+          if not re.search(r"android\s*\{", s):
               raise SystemExit("No android { } block found in generated Gradle file.")
 
           props = '''def keystoreProperties = new Properties()
@@ -96,7 +96,7 @@ jobs:
           '''
           s = props + s
           s = re.sub(
-              r"(android\\s*\\{)",
+              r"(android\s*\{)",
               r"""\1
               signingConfigs {
                   release {
@@ -111,27 +111,27 @@ jobs:
               count=1,
           )
 
-          release_match = re.search(r"release\\s*\\{", s)
+          release_match = re.search(r"release\s*\{", s)
           if not release_match:
               s = re.sub(
-                  r"(buildTypes\\s*\\{)",
-                  r"\1\\n        release { signingConfig signingConfigs.release }",
+                  r"(buildTypes\s*\{)",
+                  r"\1\n        release { signingConfig signingConfigs.release }",
                   s,
                   count=1,
               )
           else:
               # The first release block after signingConfigs is the signing config itself.
               # Patch the buildTypes release block specifically.
-              bt = re.search(r"buildTypes\\s*\\{", s)
+              bt = re.search(r"buildTypes\s*\{", s)
               if not bt:
                   raise SystemExit("No buildTypes block found.")
               tail = s[bt.end():]
-              rel = re.search(r"release\\s*\\{", tail)
+              rel = re.search(r"release\s*\{", tail)
               if not rel:
-                  s = s[:bt.end()] + "\\n        release { signingConfig signingConfigs.release }" + s[bt.end():]
+                  s = s[:bt.end()] + "\n        release { signingConfig signingConfigs.release }" + s[bt.end():]
               else:
                   start = bt.end() + rel.end()
-                  s = s[:start] + "\\n            signingConfig signingConfigs.release" + s[start:]
+                  s = s[:start] + "\n            signingConfig signingConfigs.release" + s[start:]
           p.write_text(s)
           PY
 
