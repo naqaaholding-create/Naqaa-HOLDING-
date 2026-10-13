@@ -16,7 +16,7 @@ from pwdlib import PasswordHash
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
-from payments_live import PaymentVerificationError, address_to_hex20, verify_usdt_transfer
+from payments_live import PaymentVerificationError, address_to_hex20, check_mainnet_provider, verify_usdt_transfer
 
 DATABASE_URL = os.getenv("FIELD_LAB_DATABASE_URL", "sqlite:///./field_lab.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -279,6 +279,12 @@ def list_plans() -> dict:
 @app.get("/payments/status")
 def payment_status() -> dict:
     problems = payment_configuration_problems()
+    api_key = os.getenv("TRONGRID_API_KEY", "").strip()
+    if not problems:
+        try:
+            check_mainnet_provider(api_key)
+        except PaymentVerificationError:
+            problems.append("The TRON mainnet provider is unreachable; live invoices are disabled")
     receive_address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
     try:
         address_to_hex20(receive_address)
@@ -314,6 +320,10 @@ def create_payment_intent(payload: CreatePaymentIntentInput, user: User = Depend
                           db: Session = Depends(get_db)) -> dict:
     if not payments_enabled():
         raise HTTPException(status_code=503, detail="الدفع الحقيقي غير جاهز بعد. لم يتم إنشاء طلب دفع.")
+    try:
+        check_mainnet_provider(os.getenv("TRONGRID_API_KEY", "").strip())
+    except PaymentVerificationError as exc:
+        raise HTTPException(status_code=503, detail="شبكة TRON غير متاحة للتحقق الآن؛ لم يُنشأ طلب ولا ترسل أي مبلغ.") from exc
     current_plan = active_plan(user)
     if current_plan != "free" and current_plan != payload.plan_code:
         raise HTTPException(status_code=409, detail="لديك اشتراك مدفوع نشط؛ جدّد الباقة نفسها أو انتظر انتهاءها.")
