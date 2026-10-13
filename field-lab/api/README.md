@@ -43,9 +43,9 @@ Run `pip install -r requirements.txt pytest httpx` and then `pytest -q`. GitHub 
 ## Important limitations
 
 - Live payments are disabled by default. They become available only when all production settings are valid; prices alone do not enable checkout.
-- The account UI is not yet fully integrated with actual site creation; the API is an initial backend milestone.
+- Site records and photos are currently stored in the browser's local IndexedDB, not synced to the server or shared across devices. If the API URL is configured, site quota is checked against the account before local save.
 - Usage limits must be checked by the server before creating records or running any analysis. The client must not call `/usage/consume` until it is ready to perform the corresponding action, or users could consume quota without completing it.
-- Before production: configure a strong secret, HTTPS, an externally managed database, database migrations, rate limiting, account verification/password reset, audit logging, backups, and a verified payment provider/webhook. Add atomic quota consumption / idempotency for concurrent requests before public launch.
+- Before production: configure a strong secret, HTTPS, a persistent database, schema migrations, rate limiting, account verification/password reset, audit logging, backups, monitoring, and independent security review.
 - No automatic scientific image analysis is provided by this API.
 
 
