@@ -128,7 +128,7 @@ def test_subscription_activates_only_after_verified_payment(monkeypatch):
     assert usage["plan"] == "daily"
     assert usage["payment_enabled"] is True
 
-    second_invoice = client.post("/payments/intents", headers=headers, json={"plan_code": "daily"})
+    second_invoice = client.post("/payments/intents", headers=headers, json={"plan_code": "daily", "payer_address": USDT_TRON_CONTRACT})
     assert second_invoice.status_code == 201, second_invoice.text
     duplicate = client.post("/payments/verify", headers=headers, json={
         "intent_id": second_invoice.json()["intent_id"], "txid": txid,
