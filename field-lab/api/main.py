@@ -218,6 +218,12 @@ def payment_configuration_problems() -> list[str]:
         problems.append("Persistent PostgreSQL is required for live payments")
     if not any(origin.lower().startswith("https://") for origin in allowed_origins):
         problems.append("At least one HTTPS frontend origin must be configured")
+    try:
+        confirmations = int(os.getenv("FIELD_LAB_TRON_MIN_CONFIRMATIONS", "20"))
+        if confirmations < 20:
+            problems.append("FIELD_LAB_TRON_MIN_CONFIRMATIONS must be at least 20")
+    except ValueError:
+        problems.append("FIELD_LAB_TRON_MIN_CONFIRMATIONS must be an integer")
     return problems
 
 
