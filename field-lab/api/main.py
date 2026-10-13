@@ -1,6 +1,4 @@
-"""NAQAA Field Lab API: accounts and server-enforced usage quotas.
-Payment processing is intentionally not implemented; paid plans cannot be self-activated.
-"""
+"""NAQAA Field Lab API: accounts, quotas, and fail-closed verified USDT subscriptions."""
 from __future__ import annotations
 
 import os
@@ -14,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from pwdlib import PasswordHash
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, create_engine, select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from payments_live import PaymentVerificationError, address_to_hex20, check_mainnet_provider, verify_usdt_transfer
 
@@ -28,10 +26,12 @@ TOKEN_HOURS = int(os.getenv("FIELD_LAB_TOKEN_HOURS", "12"))
 password_hash = PasswordHash.recommended()
 
 if not JWT_SECRET:
-    # Safe for local preview only; set a stable secret in deployment.
-    if os.getenv("FIELD_LAB_ENV", "development") == "production":
+    # Safe for local preview only; set a strong secret in deployment.
+    if os.getenv("FIELD_LAB_ENV", "development").lower() == "production":
         raise RuntimeError("FIELD_LAB_JWT_SECRET must be set in production")
     JWT_SECRET = "local-preview-only-change-before-deployment"
+if os.getenv("FIELD_LAB_ENV", "development").lower() == "production" and len(JWT_SECRET.encode("utf-8")) < 32:
+    raise RuntimeError("FIELD_LAB_JWT_SECRET must contain at least 32 bytes in production")
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
@@ -212,6 +212,8 @@ def usage_for(user: User) -> UsageOutput:
 def payment_configuration_problems() -> list[str]:
     """Fail closed unless all production settings are valid."""
     problems: list[str] = []
+    if len(JWT_SECRET.encode("utf-8")) < 32:
+        problems.append("FIELD_LAB_JWT_SECRET must contain at least 32 bytes")
     if os.getenv("FIELD_LAB_ENV", "development").lower() != "production":
         problems.append("FIELD_LAB_ENV must be production")
     if os.getenv("FIELD_LAB_LIVE_PAYMENTS_ENABLED", "0").strip() != "1":
@@ -282,6 +284,12 @@ def payment_status() -> dict:
     api_key = os.getenv("TRONGRID_API_KEY", "").strip()
     if not problems:
         try:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except SQLAlchemyError:
+            problems.append("The persistent database is unavailable; live invoices are disabled")
+    if not problems:
+        try:
             check_mainnet_provider(api_key)
         except PaymentVerificationError:
             problems.append("The TRON mainnet provider is unreachable; live invoices are disabled")
@@ -320,6 +328,11 @@ def create_payment_intent(payload: CreatePaymentIntentInput, user: User = Depend
                           db: Session = Depends(get_db)) -> dict:
     if not payments_enabled():
         raise HTTPException(status_code=503, detail="الدفع الحقيقي غير جاهز بعد. لم يتم إنشاء طلب دفع.")
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="قاعدة البيانات الإنتاجية غير متاحة؛ لم يُنشأ طلب ولا ترسل أي مبلغ.") from exc
     try:
         check_mainnet_provider(os.getenv("TRONGRID_API_KEY", "").strip())
     except PaymentVerificationError as exc:
