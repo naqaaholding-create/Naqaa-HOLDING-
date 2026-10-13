@@ -29,7 +29,9 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:
-          enablement: true
+          token: ${{ secrets.PAGES_TOKEN || github.token }}
+          # A repository-scoped token with Pages/admin rights is needed for first-time enablement.
+          enablement: ${{ secrets.PAGES_TOKEN != '' }}
       - name: Upload Field Lab site
         uses: actions/upload-pages-artifact@v3
         with:
