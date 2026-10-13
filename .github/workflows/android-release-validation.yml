@@ -1,0 +1,79 @@
+name: Android release build validation
+
+on:
+  pull_request:
+    paths:
+      - "field-lab/**"
+      - ".github/workflows/android-release-validation.yml"
+  push:
+    branches:
+      - release/production-android
+    paths:
+      - "field-lab/**"
+      - ".github/workflows/android-release-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: field-lab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Install Capacitor dependencies
+        run: npm install
+
+      - name: Prepare web assets
+        run: |
+          set -euo pipefail
+          mkdir -p www
+          cp *.html *.css *.js www/
+          test -s www/index.html
+
+      - name: Generate Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Build release APK (unsigned)
+        working-directory: field-lab/android
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+          APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          if [ ! -s "$APK" ]; then
+            APK="app/build/outputs/apk/release/app-release.apk"
+          fi
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -E "^package: name='com.naqaaholding.fieldlab'"
+
+      - name: Upload validation APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: naqaa-field-lab-unsigned-release-validation
+          path: field-lab/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 7

@@ -4,6 +4,10 @@ Payment processing is intentionally not implemented; paid plans cannot be self-a
 from __future__ import annotations
 
 import os
+import json
+import urllib.parse
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta, timezone
 from typing import Generator
 
@@ -46,6 +50,20 @@ class User(Base):
     sites_used: Mapped[int] = mapped_column(Integer, default=0)
     questions_used: Mapped[int] = mapped_column(Integer, default=0)
     usage_window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+
+
+class Payment(Base):
+    __tablename__ = "field_lab_payments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("field_lab_users.id"), index=True)
+    plan: Mapped[str] = mapped_column(String(20))
+    expected_amount: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    txid: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 Base.metadata.create_all(bind=engine)
@@ -100,6 +118,16 @@ class UsageOutput(BaseModel):
 class ConsumeInput(BaseModel):
     action: str = Field(pattern="^(site|question)$")
 
+
+
+
+class PaymentCreateInput(BaseModel):
+    plan: str = Field(pattern="^(daily|weekly|monthly)$")
+
+
+class PaymentConfirmInput(BaseModel):
+    payment_id: int = Field(gt=0)
+    txid: str = Field(min_length=64, max_length=64, pattern="^[a-fA-F0-9]{64}$")
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -192,6 +220,97 @@ def payment_status() -> dict:
             "ومراجعة إدارية للسحب، واختبارات أمنية قبل استقبال أموال حقيقية."
         ),
     }
+
+
+
+
+TRON_API_BASE = os.getenv("TRON_API_BASE", "https://api.trongrid.io").rstrip("/")
+TRON_USDT_CONTRACT = os.getenv("FIELD_LAB_TRON_USDT_CONTRACT", "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj")
+DEFAULT_RECEIVE_ADDRESS = "TXPtDuKPXKrTWLpnDH7z25tDsPt2zqv4a5"
+
+def require_payments_ready() -> str:
+    """Fail closed unless an operator explicitly enables verified production payments."""
+    enabled = os.getenv("FIELD_LAB_PAYMENTS_ENABLED", "").strip().lower() == "true"
+    address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
+    provider_key = os.getenv("TRONGRID_API_KEY", "").strip()
+    if os.getenv("FIELD_LAB_ENV", "development").lower() != "production" or not enabled or not address or not provider_key:
+        raise HTTPException(status_code=503, detail="الدفع الحقيقي غير جاهز؛ لم يتم تفعيل إعدادات الإنتاج والتحقق من شبكة TRON")
+    return address
+
+
+
+def _verified_transfer(txid: str) -> dict:
+    headers = {"Accept": "application/json", "User-Agent": "NAQAA-Field-Lab/1.0"}
+    key = os.getenv("TRONGRID_API_KEY", "").strip()
+    if key:
+        headers["TRON-PRO-API-KEY"] = key
+    url = f"{TRON_API_BASE}/v1/transactions/{urllib.parse.quote(txid)}/events?only_confirmed=true&limit=200&contract_address={urllib.parse.quote(TRON_USDT_CONTRACT)}"
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail="تعذر التحقق من شبكة TRON؛ أعد المحاولة") from exc
+    for event in body.get("data", []):
+        if event.get("transaction_id", "").lower() == txid.lower() and event.get("event_name") == "Transfer":
+            token = event.get("token_info") or {}
+            result = event.get("result") or {}
+            return {"to": result.get("to"), "value": result.get("value"), "decimals": int(token.get("decimals", 6)), "contract": token.get("address")}
+    raise HTTPException(status_code=400, detail="لم يُعثر على تحويل USDT مؤكد بهذه المعاملة")
+
+
+@app.post("/payments/create", status_code=201)
+def create_payment(payload: PaymentCreateInput, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    address = require_payments_ready()
+    plan = PLANS[payload.plan]
+    payment = Payment(user_id=user.id, plan=payload.plan, expected_amount=f'{plan["price_usd"]:.2f}')
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return {"payment_id": payment.id, "plan": payment.plan, "amount": payment.expected_amount, "currency": "USDT", "network": "TRC20", "receive_address": address, "token_contract": TRON_USDT_CONTRACT, "status": payment.status}
+
+
+@app.post("/payments/confirm")
+def confirm_payment(payload: PaymentConfirmInput, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    address = require_payments_ready()
+    payment = db.scalar(select(Payment).where(Payment.id == payload.payment_id, Payment.user_id == user.id))
+    if payment is None:
+        raise HTTPException(status_code=404, detail="طلب الدفع غير موجود")
+    if payment.status == "confirmed":
+        if payment.txid == payload.txid.lower():
+            return {"status": "confirmed", "plan": payment.plan, "expires_at": user.plan_expires_at}
+        raise HTTPException(status_code=409, detail="طلب الدفع مؤكد مسبقًا")
+    transfer = _verified_transfer(payload.txid)
+    if (transfer["to"] or "").lower() != address.lower() or (transfer["contract"] or "").lower() != TRON_USDT_CONTRACT.lower():
+        raise HTTPException(status_code=400, detail="عنوان الاستقبال أو عقد USDT غير مطابق")
+    try:
+        amount = int(transfer["value"]) / (10 ** transfer["decimals"])
+    except (ValueError, TypeError, ZeroDivisionError):
+        raise HTTPException(status_code=400, detail="مبلغ التحويل غير صالح")
+    if abs(amount - float(payment.expected_amount)) > 0.000001:
+        raise HTTPException(status_code=400, detail=f"المبلغ غير مطابق؛ المطلوب {payment.expected_amount} USDT")
+    if db.scalar(select(Payment).where(Payment.txid == payload.txid.lower())):
+        raise HTTPException(status_code=409, detail="معرّف المعاملة مستخدم سابقًا")
+    now = datetime.now(timezone.utc)
+    expiry = user.plan_expires_at
+    if expiry and expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    start = expiry if expiry and expiry > now else now
+    user.plan = payment.plan
+    user.plan_expires_at = start + timedelta(days=PLANS[payment.plan]["duration_days"])
+    user.sites_used = 0
+    user.questions_used = 0
+    user.usage_window_started_at = now
+    payment.status = "confirmed"
+    payment.txid = payload.txid.lower()
+    payment.confirmed_at = now
+    db.add_all([user, payment])
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="المعاملة ربما سجلت سابقًا") from exc
+    return {"status": "confirmed", "plan": payment.plan, "expires_at": user.plan_expires_at, "amount": payment.expected_amount, "currency": "USDT", "network": "TRC20"}
 
 
 

@@ -188,7 +188,7 @@
         <div><p class="eyebrow">PLANS & ACCESS</p><h2>باقات مختبر نقاء</h2></div>
         <span class="step">04</span>
       </div>
-      <p class="pricing-intro">اختر الباقة المناسبة لحجم عملك الميداني. الأسعار والحدود أدناه مقترحة للنسخة التجريبية، ولا يوجد تحصيل مالي أو تفعيل اشتراك إلكتروني حتى الآن.</p>
+      <p class="pricing-intro">اختر الباقة المناسبة. يتطلب الدفع تسجيل الدخول وإتمام تحويل USDT عبر شبكة TRON (TRC20).</p>
       <div class="plans-grid">
         <article class="plan-card plan-trial">
           <span class="plan-label">للتجربة</span><h3>التجربة المجانية</h3><p class="plan-price">$0 <small>/ مجانًا</small></p>
@@ -198,20 +198,32 @@
         <article class="plan-card">
           <span class="plan-label">استخدام قصير</span><h3>الاشتراك اليومي</h3><p class="plan-price">$10 <small>/ يوم</small></p>
           <ul><li>موقعان خلال مدة الاشتراك</li><li>20 استفسارًا يوميًا</li><li>تقرير واحد لكل موقع</li></ul>
-          <button class="button button-secondary button-full plan-info" type="button" data-plan="الاشتراك اليومي">تفاصيل الباقة</button>
+          <button class="button button-primary button-full plan-buy" type="button" data-plan-code="daily">الدفع بـ USDT</button>
         </article>
         <article class="plan-card">
           <span class="plan-label">عمل ميداني</span><h3>الاشتراك الأسبوعي</h3><p class="plan-price">$50 <small>/ 7 أيام</small></p>
           <ul><li>10 مواقع خلال 7 أيام</li><li>100 استفسار خلال الأسبوع</li><li>تقرير واحد لكل موقع</li></ul>
-          <button class="button button-secondary button-full plan-info" type="button" data-plan="الاشتراك الأسبوعي">تفاصيل الباقة</button>
+          <button class="button button-primary button-full plan-buy" type="button" data-plan-code="weekly">الدفع بـ USDT</button>
         </article>
         <article class="plan-card plan-featured">
           <span class="plan-label">للاستخدام المنتظم</span><h3>الاشتراك الشهري</h3><p class="plan-price">$100 <small>/ 30 يومًا</small></p>
           <ul><li>30 موقعًا خلال 30 يومًا</li><li>300 استفسار خلال الشهر</li><li>تقرير واحد لكل موقع</li></ul>
-          <button class="button button-primary button-full plan-info" type="button" data-plan="الاشتراك الشهري">تفاصيل الباقة</button>
+          <button class="button button-primary button-full plan-buy" type="button" data-plan-code="monthly">الدفع بـ USDT</button>
         </article>
       </div>
-      <div class="plan-notice" id="plan-message" role="status" aria-live="polite">تنبيه: الباقات للعرض والتخطيط فقط. الدفع، حساب المستخدم، واحتساب الحصص تحتاج إلى خادم آمن وتكامل دفع قبل إطلاق الاشتراكات.</div>
+      <div class="plan-notice" id="plan-message" role="status" aria-live="polite">الدفع عبر USDT-TRC20 يتطلب نشر الخادم وضبط عنوانه واختبار التحقق من المعاملات قبل استقبال أموال حقيقية.</div>
+      <section id="payment-panel" class="usage-panel" hidden>
+        <h3>إتمام الدفع عبر USDT (TRC20)</h3>
+        <p id="payment-details" class="helper"></p>
+        <form id="payment-confirm-form" class="account-form">
+          <label for="payment-id">رقم طلب الدفع</label>
+          <input id="payment-id" type="number" min="1" required readonly>
+          <label for="payment-txid">معرّف المعاملة (Transaction ID)</label>
+          <input id="payment-txid" name="txid" required minlength="64" maxlength="128" pattern="[a-fA-F0-9]+" placeholder="الصق معرّف المعاملة هنا">
+          <button type="submit" class="button button-primary button-full">تحقق من التحويل وفعّل الاشتراك</button>
+          <p class="helper">لا تكتب عبارة الاسترداد أو المفتاح الخاص. لا تُفعّل الباقة إلا إذا تحقّق الخادم من التحويل.</p>
+        </form>
+      </section>
       <p class="helper">الموقع المقصود هنا سجل موقع جديد ضمن حصة الباقة. وحدود الاستخدام مقترحة وقابلة للتعديل قبل الإطلاق.</p>
     </section>
 
