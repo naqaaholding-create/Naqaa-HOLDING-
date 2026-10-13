@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from pwdlib import PasswordHash
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, create_engine, select
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from payments_live import PaymentVerificationError, address_to_hex20, verify_usdt_transfer
@@ -67,6 +67,15 @@ class UsageReceipt(Base):
 
 class PaymentIntent(Base):
     __tablename__ = "field_lab_payment_intents"
+    __table_args__ = (
+        Index(
+            "uq_active_payment_amount",
+            "amount_base_units",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+            sqlite_where=text("status = 'pending'"),
+        ),
+    )
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("field_lab_users.id"), index=True)
     plan_code: Mapped[str] = mapped_column(String(20))
@@ -314,6 +323,15 @@ def create_payment_intent(payload: CreatePaymentIntentInput, user: User = Depend
     except PaymentVerificationError as exc:
         raise HTTPException(status_code=422, detail="عنوان المرسل ليس عنوان TRON Mainnet صالحًا.") from exc
     now = datetime.now(timezone.utc)
+    # Expire old invoices before allocating a currently-unique on-chain amount.
+    stale = db.scalars(select(PaymentIntent).where(
+        PaymentIntent.status == "pending",
+        PaymentIntent.expires_at <= now,
+    )).all()
+    for old_intent in stale:
+        old_intent.status = "expired"
+    db.flush()
+
     existing = db.scalar(select(PaymentIntent).where(
         PaymentIntent.user_id == user.id,
         PaymentIntent.plan_code == payload.plan_code,
@@ -324,14 +342,30 @@ def create_payment_intent(payload: CreatePaymentIntentInput, user: User = Depend
     receive_address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
     if existing:
         return payment_intent_output(existing, receive_address)
+
+    base_amount = int(PLANS[payload.plan_code]["price_usd"]) * 1_000_000
+    open_amounts = set(db.scalars(select(PaymentIntent.amount_base_units).where(
+        PaymentIntent.status == "pending",
+        PaymentIntent.expires_at > now,
+    )).all())
+    # Add a unique micro-USDT suffix (max +0.009999 USDT) to disambiguate concurrent
+    # invoices going to the same receiver. A partial unique index guards concurrent requests.
+    amount = next((base_amount + suffix for suffix in range(10_000)
+                   if base_amount + suffix not in open_amounts), None)
+    if amount is None:
+        raise HTTPException(status_code=503, detail="اكتملت خانات مبالغ الدفع النشطة لهذه الباقة؛ حاول مجددًا لاحقًا.")
     intent = PaymentIntent(
         id=str(uuid.uuid4()), user_id=user.id, plan_code=payload.plan_code,
         payer_address=payer_address,
-        amount_base_units=int(PLANS[payload.plan_code]["price_usd"]) * 1_000_000,
+        amount_base_units=amount,
         created_at=now, expires_at=now + timedelta(minutes=60), status="pending",
     )
     db.add(intent)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="أنشأ عميل آخر طلب دفع متزامنًا؛ أعد إنشاء الطلب قبل التحويل.") from exc
     db.refresh(intent)
     return payment_intent_output(intent, receive_address)
 
