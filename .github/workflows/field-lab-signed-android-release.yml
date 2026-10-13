@@ -1,0 +1,167 @@
+name: NAQAA Field Lab Signed Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: Android versionCode
+        required: true
+        default: "1"
+      version_name:
+        description: Android versionName
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: read
+
+jobs:
+  signed-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: field-lab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: field-lab/package.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Install dependencies and prepare web assets
+        run: |
+          set -euo pipefail
+          npm install
+          mkdir -p www
+          cp *.html *.css *.js www/
+
+      - name: Generate Android project
+        run: |
+          set -euo pipefail
+          npx cap add android
+          npx cap sync android
+
+      - name: Configure signing and version
+        working-directory: field-lab/android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          VERSION_NAME: ${{ inputs.version_name }}
+        run: |
+          set -euo pipefail
+          for v in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "Missing required GitHub Actions secret: $v" >&2
+              exit 1
+            fi
+          done
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
+          [[ "$VERSION_NAME" =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]]
+          echo "$KEYSTORE_B64" | base64 --decode > naqaa-release-key.jks
+          test -s naqaa-release-key.jks
+          export KEYSTORE_FILE="naqaa-release-key.jks"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import re
+
+          p = Path("app/build.gradle")
+          source = p.read_text(encoding="utf-8")
+          replacements = [
+              (r"versionCode\\s+\\d+", f'versionCode {os.environ["VERSION_CODE"]}'),
+              (r'versionName\\s+"[^"]*"', f'versionName "{os.environ["VERSION_NAME"]}"'),
+          ]
+          for pattern, value in replacements:
+              source, count = re.subn(pattern, value, source, count=1)
+              if count != 1:
+                  raise SystemExit(f"Could not safely update Gradle setting: {pattern}")
+
+          prefix = '''
+          def naqaaSigningFile = rootProject.file("keystore.properties")
+          def naqaaSigning = new Properties()
+          naqaaSigning.load(new FileInputStream(naqaaSigningFile))
+          '''
+          if "signingConfigs {" not in source:
+              source = source.replace("android {", """android {
+              signingConfigs {
+                  release {
+                      storeFile rootProject.file(naqaaSigning['storeFile'])
+                      storePassword naqaaSigning['storePassword']
+                      keyAlias naqaaSigning['keyAlias']
+                      keyPassword naqaaSigning['keyPassword']
+                  }
+              }
+          """, 1)
+          if "signingConfig signingConfigs.release" not in source:
+              match = re.search(r"buildTypes\\s*\\{\\s*release\\s*\\{", source)
+              if not match:
+                  raise SystemExit("Could not locate Android release build type")
+              insert_at = match.end()
+              source = source[:insert_at] + "\\n            signingConfig signingConfigs.release" + source[insert_at:]
+          p.write_text(prefix + source, encoding="utf-8")
+
+          def prop(v):
+              return v.replace("\\\\", "\\\\\\\\").replace("\\n", "\\\\n").replace("\\r", "\\\\r").replace(":", "\\\\:").replace("=", "\\\\=").replace("#", "\\\\#").replace("!", "\\\\!")
+          values = {
+              "storeFile": os.environ["KEYSTORE_FILE"],
+              "storePassword": os.environ["STORE_PASSWORD"],
+              "keyAlias": os.environ["KEY_ALIAS"],
+              "keyPassword": os.environ["KEY_PASSWORD"],
+          }
+          Path("keystore.properties").write_text(
+              "".join(f"{k}={prop(v)}\\n" for k, v in values.items()),
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Build signed APK and Play Store AAB
+        working-directory: field-lab/android
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Verify signed artifacts
+        working-directory: field-lab/android
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$APK"
+          test -s "$AAB"
+          jarsigner -verify "$AAB"
+          apksigner verify --verbose "$APK"
+          echo "APK_SHA256=$(sha256sum "$APK" | cut -d' ' -f1)"
+          echo "AAB_SHA256=$(sha256sum "$AAB" | cut -d' ' -f1)"
+
+      - name: Upload verified signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: naqaa-field-lab-signed-release
+          path: |
+            field-lab/android/app/build/outputs/apk/release/app-release.apk
+            field-lab/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f field-lab/android/naqaa-release-key.jks field-lab/android/keystore.properties
