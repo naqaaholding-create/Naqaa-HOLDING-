@@ -24,7 +24,10 @@ Open `/docs` for the interactive API reference and `/health` for a health check.
 - `POST /usage/consume` with `{"action":"site"}` or `{"action":"question"}` — consume a quota unit.
 - `GET /plans` — show the proposed prices and limits.
 - `GET /health` — basic health status.
-- `GET /payments/status` — readiness-only status for the planned USDT-TRC20 integration; always reports live payments and withdrawals disabled until transaction verification and ledger controls are implemented.
+- `GET /payments/status` — shows whether all required production settings are valid.
+- `POST /payments/intents` — creates an authenticated USDT subscription invoice.
+- `POST /payments/verify` — verifies a mainnet transaction before subscription activation.
+- `GET /payments/history` — lists payment requests belonging to the logged-in account.
 
 ## Proposed limits
 
@@ -39,7 +42,7 @@ Run `pip install -r requirements.txt pytest httpx` and then `pytest -q`. GitHub 
 
 ## Important limitations
 
-- Payments are disabled. Paid plans cannot be purchased or self-activated. Do not treat a displayed price as a payment integration.
+- Live payments are disabled by default. They become available only when all production settings are valid; prices alone do not enable checkout.
 - The account UI is not yet fully integrated with actual site creation; the API is an initial backend milestone.
 - Usage limits must be checked by the server before creating records or running any analysis. The client must not call `/usage/consume` until it is ready to perform the corresponding action, or users could consume quota without completing it.
 - Before production: configure a strong secret, HTTPS, an externally managed database, database migrations, rate limiting, account verification/password reset, audit logging, backups, and a verified payment provider/webhook. Add atomic quota consumption / idempotency for concurrent requests before public launch.
@@ -48,6 +51,6 @@ Run `pip install -r requirements.txt pytest httpx` and then `pytest -q`. GitHub 
 
 ## Real-money readiness (not live yet)
 
-The wallet interface no longer creates fake balances. The current payment status endpoint is fail-closed and reports live payments/withdrawals as disabled. The intended first payment route is USDT on TRON (TRC20) using a **public receiving address** from SafePal. Do not commit the address or provider keys to Git; configure secrets only in the deployment environment.
+The payment feature accepts subscription purchases only; this app has no withdrawal feature. It accepts USDT solely on TRON (TRC20) to the configured public receiving address. The server validates the official Tether contract, exact amount, recipient address, successful execution, invoice time window, minimum 20 confirmations, and unique transaction IDs. Subscription activation is committed with the payment record in the same database transaction. Never commit the receiver address or provider API key to Git; set these only in the hosting provider's secret/environment settings. Never request or store a SafePal seed phrase or private key.
 
-Before accepting real funds, implement and test: chain transaction lookup and confirmation thresholds; exact token contract and amount checks; unique payment intents and idempotent processing; a server-side double-entry ledger; subscription activation only after verified settlement; authenticated admin review for withdrawals; audit logs and alerts; abuse/rate limiting; backups; and an independent security review. Never request or store a SafePal seed phrase or private key in the app or server. Do not send money while the app says payments are disabled.
+Live payments require `FIELD_LAB_ENV=production`, `FIELD_LAB_LIVE_PAYMENTS_ENABLED=1`, a valid `FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS`, `TRONGRID_API_KEY`, persistent PostgreSQL at `FIELD_LAB_DATABASE_URL`, and an HTTPS origin in `FIELD_LAB_ALLOWED_ORIGINS`. The default payment flag is off. Verify the receiving address in SafePal and the canonical contract with Tether's official documentation before enabling checkout. Do not tell customers to send funds while `GET /payments/status` reports `payments_enabled: false`.
