@@ -406,7 +406,7 @@ def verify_payment(payload: VerifyPaymentInput, user: User = Depends(current_use
             expected_amount_base_units=intent.amount_base_units,
             api_key=os.getenv("TRONGRID_API_KEY", "").strip(),
             min_confirmations=max(20, int(os.getenv("FIELD_LAB_TRON_MIN_CONFIRMATIONS", "20"))),
-            earliest_timestamp_ms=created_ms - 30_000, latest_timestamp_ms=expires_ms,
+            earliest_timestamp_ms=created_ms, latest_timestamp_ms=expires_ms,
         )
     except PaymentVerificationError as exc:
         raise HTTPException(status_code=422, detail="لم يتم اعتماد الدفع: " + str(exc)) from exc
