@@ -77,6 +77,7 @@ def verify_usdt_transfer(
     txid: str,
     *,
     receiving_address: str,
+    payer_address: str,
     expected_amount_base_units: int,
     api_key: str = "",
     min_confirmations: int = 20,
@@ -93,6 +94,7 @@ def verify_usdt_transfer(
         raise PaymentVerificationError("Production confirmation threshold cannot be below 20")
 
     receiver_hex = address_to_hex20(receiving_address)
+    payer_hex = address_to_hex20(payer_address)
     contract_hex = address_to_hex20(USDT_TRON_CONTRACT)
 
     info = _request_json("/wallet/gettransactioninfobyid", api_key, {"value": txid})
@@ -131,7 +133,10 @@ def verify_usdt_transfer(
             continue
         if str(topics[0]).lower().removeprefix("0x") != TRANSFER_TOPIC0:
             continue
+        sender_topic = str(topics[1]).lower().removeprefix("0x")
         recipient_topic = str(topics[2]).lower().removeprefix("0x")
+        if len(sender_topic) != 64 or sender_topic[-40:] != payer_hex:
+            continue
         if len(recipient_topic) != 64 or recipient_topic[-40:] != receiver_hex:
             continue
         if not HEX64.fullmatch(data):
