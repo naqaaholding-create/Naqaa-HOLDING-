@@ -104,7 +104,7 @@ def test_subscription_activates_only_after_verified_payment(monkeypatch):
     monkeypatch.setenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", USDT_TRON_CONTRACT)
     token = register()
     headers = {"Authorization": f"Bearer {token}"}
-    invoice_response = client.post("/payments/intents", headers=headers, json={"plan_code": "daily"})
+    invoice_response = client.post("/payments/intents", headers=headers, json={"plan_code": "daily", "payer_address": USDT_TRON_CONTRACT})
     assert invoice_response.status_code == 201, invoice_response.text
     invoice = invoice_response.json()
     assert invoice["amount_usdt"] == "10"
