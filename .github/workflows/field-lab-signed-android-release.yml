@@ -1,6 +1,11 @@
 name: NAQAA Field Lab Signed Android Release
 
 on:
+  push:
+    branches: ["release/**"]
+    paths:
+      - "field-lab/**"
+      - ".github/workflows/field-lab-signed-android-release.yml"
   workflow_dispatch:
     inputs:
       version_code:
@@ -63,8 +68,8 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          VERSION_CODE: ${{ inputs.version_code }}
-          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code || '1' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
         run: |
           set -euo pipefail
           for v in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
