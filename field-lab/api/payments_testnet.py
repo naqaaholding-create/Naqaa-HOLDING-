@@ -65,13 +65,13 @@ def address_to_hex20(address: str) -> str:
     return body[1:].hex()
 
 
-def _request_json(base: str, path: str, api_key: str = "") -> dict[str, Any]:
+def _request_json(base: str, path: str, api_key: str = "", payload: dict[str, Any] | None = None) -> dict[str, Any]:
     if base != NILE_API:
         raise VerificationError("Only the official Nile testnet API is allowed")
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
     if api_key:
         headers["TRON-PRO-API-KEY"] = api_key
-    request = Request(base + path, data=b"{}", headers=headers, method="POST")
+    request = Request(base + path, data=json.dumps(payload or {}).encode("utf-8"), headers=headers, method="POST")
     try:
         with urlopen(request, timeout=12) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -106,7 +106,7 @@ def verify_testnet_transfer(
     expected_recipient = address_to_hex20(receiving_address)
     expected_contract = token_contract.strip().lower()
 
-    info = _request_json(api_base, "/wallet/gettransactioninfobyid", api_key)
+    info = _request_json(api_base, "/wallet/gettransactioninfobyid", api_key, {"value": txid})
     if info.get("id", "").lower() != txid:
         raise VerificationError("Provider returned a different transaction")
     if info.get("receipt", {}).get("result") != "SUCCESS":
