@@ -73,6 +73,18 @@ def _request_json(path: str, api_key: str = "", payload: dict[str, Any] | None =
     return result
 
 
+def check_mainnet_provider(api_key: str = "") -> int:
+    """Probe the fixed mainnet endpoint before showing a customer a live invoice."""
+    head = _request_json("/wallet/getnowblock", api_key)
+    try:
+        block_number = int(head["block_header"]["raw_data"]["number"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PaymentVerificationError("Could not determine current TRON block") from exc
+    if block_number < 1:
+        raise PaymentVerificationError("TRON provider returned an invalid block height")
+    return block_number
+
+
 def verify_usdt_transfer(
     txid: str,
     *,
