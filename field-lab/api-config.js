@@ -5,5 +5,6 @@
   var host = String(window.location.hostname || "").toLowerCase();
   var onGitHubPages = host === "github.io" || host.endsWith(".github.io");
   var isSecureWeb = window.location.protocol === "https:";
-  window.FIELD_LAB_API_BASE = (!onGitHubPages && isSecureWeb) ? window.location.origin : "";
+  var isLocalWebView = host === "localhost" || host === "127.0.0.1";
+  window.FIELD_LAB_API_BASE = (!onGitHubPages && !isLocalWebView && isSecureWeb) ? window.location.origin : "";
 }());
