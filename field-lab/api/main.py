@@ -127,7 +127,7 @@ class PaymentCreateInput(BaseModel):
 
 class PaymentConfirmInput(BaseModel):
     payment_id: int = Field(gt=0)
-    txid: str = Field(min_length=64, max_length=128, pattern="^[a-fA-F0-9]+$")
+    txid: str = Field(min_length=64, max_length=64, pattern="^[a-fA-F0-9]{64}$")
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -228,6 +228,16 @@ TRON_API_BASE = os.getenv("TRON_API_BASE", "https://api.trongrid.io").rstrip("/"
 TRON_USDT_CONTRACT = os.getenv("FIELD_LAB_TRON_USDT_CONTRACT", "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj")
 DEFAULT_RECEIVE_ADDRESS = "TXPtDuKPXKrTWLpnDH7z25tDsPt2zqv4a5"
 
+def require_payments_ready() -> str:
+    """Fail closed unless an operator explicitly enables verified production payments."""
+    enabled = os.getenv("FIELD_LAB_PAYMENTS_ENABLED", "").strip().lower() == "true"
+    address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip()
+    provider_key = os.getenv("TRONGRID_API_KEY", "").strip()
+    if os.getenv("FIELD_LAB_ENV", "development").lower() != "production" or not enabled or not address or not provider_key:
+        raise HTTPException(status_code=503, detail="الدفع الحقيقي غير جاهز؛ لم يتم تفعيل إعدادات الإنتاج والتحقق من شبكة TRON")
+    return address
+
+
 
 def _verified_transfer(txid: str) -> dict:
     headers = {"Accept": "application/json", "User-Agent": "NAQAA-Field-Lab/1.0"}
@@ -249,23 +259,20 @@ def _verified_transfer(txid: str) -> dict:
     raise HTTPException(status_code=400, detail="لم يُعثر على تحويل USDT مؤكد بهذه المعاملة")
 
 
-@app.get("/payments/status")
-def payment_status() -> dict:
-    return {"payments_enabled": True, "withdrawals_enabled": False, "network": "TRON", "token": "USDT-TRC20", "receive_address": os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", DEFAULT_RECEIVE_ADDRESS), "token_contract": TRON_USDT_CONTRACT}
-
-
 @app.post("/payments/create", status_code=201)
 def create_payment(payload: PaymentCreateInput, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    address = require_payments_ready()
     plan = PLANS[payload.plan]
     payment = Payment(user_id=user.id, plan=payload.plan, expected_amount=f'{plan["price_usd"]:.2f}')
     db.add(payment)
     db.commit()
     db.refresh(payment)
-    return {"payment_id": payment.id, "plan": payment.plan, "amount": payment.expected_amount, "currency": "USDT", "network": "TRC20", "receive_address": os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", DEFAULT_RECEIVE_ADDRESS), "token_contract": TRON_USDT_CONTRACT, "status": payment.status}
+    return {"payment_id": payment.id, "plan": payment.plan, "amount": payment.expected_amount, "currency": "USDT", "network": "TRC20", "receive_address": address, "token_contract": TRON_USDT_CONTRACT, "status": payment.status}
 
 
 @app.post("/payments/confirm")
 def confirm_payment(payload: PaymentConfirmInput, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    address = require_payments_ready()
     payment = db.scalar(select(Payment).where(Payment.id == payload.payment_id, Payment.user_id == user.id))
     if payment is None:
         raise HTTPException(status_code=404, detail="طلب الدفع غير موجود")
@@ -274,7 +281,6 @@ def confirm_payment(payload: PaymentConfirmInput, user: User = Depends(current_u
             return {"status": "confirmed", "plan": payment.plan, "expires_at": user.plan_expires_at}
         raise HTTPException(status_code=409, detail="طلب الدفع مؤكد مسبقًا")
     transfer = _verified_transfer(payload.txid)
-    address = os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", DEFAULT_RECEIVE_ADDRESS).strip()
     if (transfer["to"] or "").lower() != address.lower() or (transfer["contract"] or "").lower() != TRON_USDT_CONTRACT.lower():
         raise HTTPException(status_code=400, detail="عنوان الاستقبال أو عقد USDT غير مطابق")
     try:
