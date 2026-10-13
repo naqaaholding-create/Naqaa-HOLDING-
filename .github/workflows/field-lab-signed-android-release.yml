@@ -44,11 +44,29 @@ jobs:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
       - name: Install dependencies and prepare web assets
+        env:
+          FIELD_LAB_API_BASE: ${{ secrets.FIELD_LAB_API_BASE }}
         run: |
           set -euo pipefail
           npm install
           mkdir -p www
           cp *.html *.css *.js www/
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          api_url = os.environ.get("FIELD_LAB_API_BASE", "").strip().rstrip("/")
+          parsed = urlparse(api_url)
+          if parsed.scheme != "https" or not parsed.netloc or parsed.path:
+              raise SystemExit("Set the FIELD_LAB_API_BASE GitHub Actions secret to the deployed HTTPS API origin (for example https://your-api.onrender.com).")
+          Path("www/api-config.js").write_text(
+              "window.FIELD_LAB_API_BASE = " + json.dumps(api_url) + ";\\n",
+              encoding="utf-8",
+          )
+          print("Configured the packaged Android app to use the HTTPS production API origin.")
+          PY
 
       - name: Generate Android project
         run: |
