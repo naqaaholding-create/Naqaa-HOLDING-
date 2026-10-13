@@ -180,11 +180,14 @@
           <option value="weekly">الاشتراك الأسبوعي — 50 USDT</option>
           <option value="monthly">الاشتراك الشهري — 100 USDT</option>
         </select>
+        <label for="payment-payer-address">عنوان محفظة المرسل على شبكة TRON</label>
+        <input id="payment-payer-address" type="text" autocomplete="off" inputmode="text" required maxlength="40" placeholder="T... عنوان الاستقبال من محفظتك الشخصية">
+        <p class="helper">يجب أن ترسل من عنوان المحفظة نفسه. لا تستخدم إيداعًا من منصة تداول أو عنوان طرف ثالث إذا لم يكن عنوان الإرسال ظاهرًا لديك.</p>
         <button class="button button-primary button-full" id="wallet-deposit-request" type="button">إنشاء طلب دفع آمن</button>
       </div>
       <div id="payment-instructions" class="payment-instructions" hidden>
         <h3>تعليمات الدفع</h3>
-        <p>أرسل المبلغ المحدد فقط إلى العنوان المعروض وعلى شبكة TRON (TRC20). إرسال المبلغ أو الشبكة الخطأ قد يؤدي إلى فقدان الأموال.</p>
+        <p>أرسل المبلغ المحدد فقط من عنوان محفظتك الذي أدخلته إلى العنوان المعروض على شبكة TRON (TRC20). سيتحقق الخادم من المرسل الفعلي لمنع نسب تحويل شخص آخر إلى حسابك.</p>
         <div class="payment-value"><span>المبلغ المطلوب</span><strong id="payment-amount">—</strong></div>
         <label for="payment-receiving-address">عنوان الاستقبال</label>
         <textarea id="payment-receiving-address" rows="2" readonly></textarea>
