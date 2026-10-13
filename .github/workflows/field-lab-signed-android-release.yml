@@ -119,7 +119,7 @@ jobs:
           p.write_text(prefix + source, encoding="utf-8")
 
           def prop(v):
-              return v.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace(":", "\\\\:").replace("=", "\\\\=").replace("#", "\\\\#").replace("!", "\\\\!")
+              return v.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace(":", "\\:").replace("=", "\\=").replace("#", "\\#").replace("!", "\\!")
           values = {
               "storeFile": os.environ["KEYSTORE_FILE"],
               "storePassword": os.environ["STORE_PASSWORD"],
