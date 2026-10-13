@@ -15,16 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Include NAQAA Field Lab under its own site path
-        run: |
-          set -euo pipefail
-          test -f field-lab/index.html
-          mkdir -p static/field-lab
-          cp -a field-lab/. static/field-lab/
-      - name: Configure GitHub Pages for this repository
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./static
