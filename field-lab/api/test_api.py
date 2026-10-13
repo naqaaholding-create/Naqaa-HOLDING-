@@ -101,6 +101,7 @@ def test_consume_rejects_unknown_action():
 def test_subscription_activates_only_after_verified_payment(monkeypatch):
     # Mock the chain verifier: this test never sends real money or contacts TRON.
     monkeypatch.setattr("main.payments_enabled", lambda: True)
+    monkeypatch.setattr("main.check_mainnet_provider", lambda api_key: 123456)
     monkeypatch.setenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", USDT_TRON_CONTRACT)
     token = register()
     headers = {"Authorization": f"Bearer {token}"}
@@ -148,6 +149,7 @@ def test_usage_request_id_is_idempotent():
 
 def test_concurrent_open_invoices_use_distinct_exact_amounts(monkeypatch):
     monkeypatch.setattr("main.payments_enabled", lambda: True)
+    monkeypatch.setattr("main.check_mainnet_provider", lambda api_key: 123456)
     monkeypatch.setenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", USDT_TRON_CONTRACT)
     token_a = register(email="first-payer@example.com")
     token_b = register(email="second-payer@example.com")
