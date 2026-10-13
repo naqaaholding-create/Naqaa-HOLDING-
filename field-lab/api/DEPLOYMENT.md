@@ -10,7 +10,7 @@ This API is **not yet production-ready**. Containerizing it does not deploy it, 
 - Set `FIELD_LAB_ALLOWED_ORIGINS` to the exact HTTPS frontend origins.
 - Add managed backups, monitoring, request limits, database migrations, rate limits, email verification, password reset, and audit logging.
 - Keep all secrets in the host's secret/environment settings, never in Git or the Android app.
-- Payment intents and on-chain subscription verification are implemented on `main`; keep `FIELD_LAB_LIVE_PAYMENTS_ENABLED=0` until the production checklist below passes.
+- Payment intents and on-chain subscription verification are implemented on `main`; the dedicated `render.field-lab.yaml` deploys this API and the Field Lab frontend at one origin. Keep `FIELD_LAB_LIVE_PAYMENTS_ENABLED=0` until the production checklist below passes.
 - Live payments require persistent PostgreSQL, not SQLite or ephemeral storage.
 - The app has no withdrawal feature.
 
