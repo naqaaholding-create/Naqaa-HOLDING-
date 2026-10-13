@@ -27,17 +27,19 @@ def make_tron_address(payload20: bytes) -> str:
 class TestMainnetPaymentVerifier(unittest.TestCase):
     def setUp(self):
         self.recipient = make_tron_address(bytes.fromhex("11" * 20))
+        self.sender = make_tron_address(bytes.fromhex("22" * 20))
         self.txid = "ab" * 32
         self.amount = 10_000_000
         self.contract = address_to_hex20(USDT_TRON_CONTRACT)
 
-    def event(self, recipient_hex=None, amount=None, contract=None):
+    def event(self, recipient_hex=None, amount=None, contract=None, sender_hex=None):
         recipient_hex = recipient_hex or "11" * 20
+        sender_hex = sender_hex or "22" * 20
         amount = self.amount if amount is None else amount
         contract = contract or self.contract
         return {
             "address": "41" + contract,
-            "topics": [TRANSFER_TOPIC0, "0" * 64, "0" * 24 + recipient_hex],
+            "topics": [TRANSFER_TOPIC0, "0" * 24 + sender_hex, "0" * 24 + recipient_hex],
             "data": hex(amount)[2:].zfill(64),
         }
 
@@ -59,7 +61,7 @@ class TestMainnetPaymentVerifier(unittest.TestCase):
             {"block_header": {"raw_data": {"number": 120}}},
         ]
         transfer = verify_usdt_transfer(
-            self.txid, receiving_address=self.recipient, expected_amount_base_units=self.amount
+            self.txid, receiving_address=self.recipient, payer_address=self.sender, expected_amount_base_units=self.amount
         )
         self.assertEqual(transfer.amount_base_units, self.amount)
         self.assertEqual(transfer.confirmations, 21)
@@ -73,6 +75,18 @@ class TestMainnetPaymentVerifier(unittest.TestCase):
         ]
         with self.assertRaises(PaymentVerificationError):
             verify_usdt_transfer(self.txid, receiving_address=self.recipient, expected_amount_base_units=self.amount)
+
+    @patch("payments_live._request_json")
+    def test_rejects_wrong_payer(self, request_json):
+        request_json.side_effect = [
+            self.mocked_info(event=self.event(sender_hex="33" * 20)),
+            {"block_header": {"raw_data": {"number": 120}}},
+        ]
+        with self.assertRaises(PaymentVerificationError):
+            verify_usdt_transfer(
+                self.txid, receiving_address=self.recipient, payer_address=self.sender,
+                expected_amount_base_units=self.amount
+            )
 
     @patch("payments_live._request_json")
     def test_rejects_wrong_amount(self, request_json):
@@ -106,6 +120,7 @@ class TestMainnetPaymentVerifier(unittest.TestCase):
             verify_usdt_transfer(
                 self.txid,
                 receiving_address=self.recipient,
+                payer_address=self.sender,
                 expected_amount_base_units=self.amount,
                 earliest_timestamp_ms=1_800_000_000_001,
             )
