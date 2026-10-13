@@ -53,6 +53,7 @@
   function showInvoice(data) {
     intentId = data.intent_id;
     receivingAddress = data.receive_address;
+    if (data.payer_address) document.getElementById("payment-payer-address").value = data.payer_address;
     document.getElementById("payment-amount").textContent = data.amount_usdt + " USDT";
     document.getElementById("payment-receiving-address").value = receivingAddress;
     document.getElementById("payment-expiry").textContent =
@@ -65,6 +66,11 @@
   function createInvoice() {
     var headers;
     try { headers = authHeaders(); } catch (error) { message(error.message); return; }
+    var payerAddress = document.getElementById("payment-payer-address").value.trim();
+    if (payerAddress.length < 30 || payerAddress.length > 40) {
+      message("أدخل عنوان محفظتك الشخصية الصحيح على شبكة TRON قبل إنشاء الطلب.");
+      return;
+    }
     if (!window.FIELD_LAB_PAYMENTS_ENABLED) {
       refreshStatus().then(function (ready) {
         if (ready) createInvoice();
@@ -75,7 +81,10 @@
     message("جارٍ إنشاء طلب الدفع على الخادم…");
     request("/payments/intents", {
       method: "POST", headers: headers,
-      body: JSON.stringify({ plan_code: document.getElementById("payment-plan").value })
+      body: JSON.stringify({
+        plan_code: document.getElementById("payment-plan").value,
+        payer_address: payerAddress
+      })
     }).then(showInvoice).catch(function (error) { message(error.message); });
   }
   function verifyInvoice() {
@@ -143,9 +152,10 @@
           resume.textContent = "استكمال الدفع";
           resume.addEventListener("click", function () {
             document.getElementById("payment-plan").value = item.plan_code;
+            document.getElementById("payment-payer-address").value = item.payer_address || "";
             request("/payments/intents", {
               method: "POST", headers: headers,
-              body: JSON.stringify({ plan_code: item.plan_code })
+              body: JSON.stringify({ plan_code: item.plan_code, payer_address: item.payer_address })
             }).then(showInvoice).catch(function (error) { message(error.message); });
           });
           row.appendChild(resume);
