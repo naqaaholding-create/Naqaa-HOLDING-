@@ -70,6 +70,7 @@ class PaymentIntent(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("field_lab_users.id"), index=True)
     plan_code: Mapped[str] = mapped_column(String(20))
+    payer_address: Mapped[str] = mapped_column(String(40))
     amount_base_units: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -237,6 +238,7 @@ def payment_intent_output(intent: PaymentIntent, receive_address: str) -> dict:
         "intent_id": intent.id,
         "plan_code": intent.plan_code,
         "plan_label": PLANS[intent.plan_code]["label"],
+        "payer_address": intent.payer_address,
         "amount_usdt": format_usdt(intent.amount_base_units),
         "currency": "USDT",
         "network": "TRON (TRC20)",
@@ -284,6 +286,7 @@ def payment_status() -> dict:
 
 class CreatePaymentIntentInput(BaseModel):
     plan_code: Literal["daily", "weekly", "monthly"]
+    payer_address: str = Field(min_length=30, max_length=40)
 
 
 class VerifyPaymentInput(BaseModel):
@@ -299,10 +302,16 @@ def create_payment_intent(payload: CreatePaymentIntentInput, user: User = Depend
     current_plan = active_plan(user)
     if current_plan != "free" and current_plan != payload.plan_code:
         raise HTTPException(status_code=409, detail="لديك اشتراك مدفوع نشط؛ جدّد الباقة نفسها أو انتظر انتهاءها.")
+    payer_address = payload.payer_address.strip()
+    try:
+        address_to_hex20(payer_address)
+    except PaymentVerificationError as exc:
+        raise HTTPException(status_code=422, detail="عنوان المرسل ليس عنوان TRON Mainnet صالحًا.") from exc
     now = datetime.now(timezone.utc)
     existing = db.scalar(select(PaymentIntent).where(
         PaymentIntent.user_id == user.id,
         PaymentIntent.plan_code == payload.plan_code,
+        PaymentIntent.payer_address == payer_address,
         PaymentIntent.status == "pending",
         PaymentIntent.expires_at > now,
     ).order_by(PaymentIntent.created_at.desc()))
@@ -311,6 +320,7 @@ def create_payment_intent(payload: CreatePaymentIntentInput, user: User = Depend
         return payment_intent_output(existing, receive_address)
     intent = PaymentIntent(
         id=str(uuid.uuid4()), user_id=user.id, plan_code=payload.plan_code,
+        payer_address=payer_address,
         amount_base_units=int(PLANS[payload.plan_code]["price_usd"]) * 1_000_000,
         created_at=now, expires_at=now + timedelta(minutes=60), status="pending",
     )
@@ -352,6 +362,7 @@ def verify_payment(payload: VerifyPaymentInput, user: User = Depends(current_use
     try:
         transfer = verify_usdt_transfer(
             txid, receiving_address=os.getenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "").strip(),
+            payer_address=intent.payer_address,
             expected_amount_base_units=intent.amount_base_units,
             api_key=os.getenv("TRONGRID_API_KEY", "").strip(),
             min_confirmations=max(20, int(os.getenv("FIELD_LAB_TRON_MIN_CONFIRMATIONS", "20"))),
@@ -392,7 +403,7 @@ def payment_history(user: User = Depends(current_user), db: Session = Depends(ge
                          .order_by(PaymentIntent.created_at.desc()).limit(50)).all()
     return {"transactions": [
         {"intent_id": p.id, "plan_code": p.plan_code, "plan_label": PLANS[p.plan_code]["label"],
-         "amount_usdt": format_usdt(p.amount_base_units), "status": p.status, "txid": p.txid,
+         "payer_address": p.payer_address, "amount_usdt": format_usdt(p.amount_base_units), "status": p.status, "txid": p.txid,
          "created_at": p.created_at, "confirmed_at": p.confirmed_at, "expires_at": p.expires_at}
         for p in intents
     ]}
