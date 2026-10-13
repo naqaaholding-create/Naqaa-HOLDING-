@@ -350,19 +350,47 @@
       appVersion: "0.1.0",
       storage: "local-device"
     };
-    transact("readwrite", function (store) { return store.add(record); })
-      .then(function () {
-        el("record-form").reset();
-        pendingPhotos = [];
-        showPendingPhotos();
-        el("location-status").textContent = "لم يتم طلب الموقع. اضغط الزر إذا أردت إرفاق الإحداثيات.";
-        stopCamera();
-        return renderRecords();
-      })
-      .then(function () { toast("تم حفظ السجل على هذا الجهاز فقط."); })
-      .catch(function (error) {
-        toast(error && error.name === "QuotaExceededError" ? "مساحة التخزين ممتلئة. صدّر سجلاتك واحذف الصور الكبيرة." : "تعذر الحفظ. قد تكون مساحة المتصفح ممتلئة.");
+    function persistRecord() {
+      return transact("readwrite", function (store) { return store.add(record); })
+        .then(function () {
+          el("record-form").reset();
+          pendingPhotos = [];
+          showPendingPhotos();
+          el("location-status").textContent = "لم يتم طلب الموقع. اضغط الزر إذا أردت إرفاق الإحداثيات.";
+          stopCamera();
+          return renderRecords();
+        })
+        .then(function () { toast("تم حفظ السجل على هذا الجهاز فقط."); })
+        .catch(function (error) {
+          toast(error && error.name === "QuotaExceededError" ? "مساحة التخزين ممتلئة. صدّر سجلاتك واحذف الصور الكبيرة." : "تعذر الحفظ. قد تكون مساحة المتصفح ممتلئة.");
+          throw error;
+        });
+    }
+
+    var apiBase = String(window.FIELD_LAB_API_BASE || "").trim().replace(/\/$/, "");
+    if (!apiBase) {
+      persistRecord();
+      return;
+    }
+    var authToken = String(window.FIELD_LAB_AUTH_TOKEN || "");
+    if (!authToken) {
+      toast("سجّل الدخول أولًا. يلزم ربط السجل بحصة الحساب في الخادم.");
+      return;
+    }
+    fetch(apiBase + "/usage/consume", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + authToken, "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ action: "site", request_id: record.id })
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok) throw new Error(data.detail || "تعذر التحقق من حصة المواقع.");
+        return data;
       });
+    }).then(function () {
+      return persistRecord();
+    }).catch(function (error) {
+      toast(error.message || "تعذر احتساب حصة الموقع على الخادم. لم يتم حفظ السجل.");
+    });
   }
 
   function exportAll() {
