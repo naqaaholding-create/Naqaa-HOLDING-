@@ -87,7 +87,7 @@ jobs:
           source = p.read_text(encoding="utf-8")
           replacements = [
               (r"versionCode\s+\d+", f'versionCode {os.environ["VERSION_CODE"]}'),
-              (r'versionName\\s+"[^"]*"', f'versionName "{os.environ["VERSION_NAME"]}"'),
+              (r'versionName\s+"[^"]*"', f'versionName "{os.environ["VERSION_NAME"]}"'),
           ]
           for pattern, value in replacements:
               source, count = re.subn(pattern, value, source, count=1)
