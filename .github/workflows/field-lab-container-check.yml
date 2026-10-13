@@ -1,0 +1,48 @@
+name: NAQAA Field Lab production container check
+on:
+  push:
+    branches: [main]
+    paths:
+      - "field-lab/api/**"
+      - "field-lab/*.html"
+      - "field-lab/*.css"
+      - "field-lab/*.js"
+      - "render.field-lab.yaml"
+      - ".github/workflows/field-lab-container-check.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  container-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production container from repository root
+        run: docker build --file field-lab/api/Dockerfile --tag naqaa-field-lab:ci .
+      - name: Run with isolated test settings (no live payments)
+        run: |
+          set -euo pipefail
+          docker run --detach --name field-lab-ci \
+            --publish 8000:8000 \
+            --env FIELD_LAB_ENV=test \
+            --env FIELD_LAB_JWT_SECRET=ci-only-not-a-production-secret-value-123456 \
+            --env FIELD_LAB_DATABASE_URL=sqlite:////tmp/field-lab-ci.db \
+            --env FIELD_LAB_LIVE_PAYMENTS_ENABLED=0 \
+            naqaa-field-lab:ci
+          cleanup() { docker rm --force field-lab-ci >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health >/tmp/health.json; then break; fi
+            sleep 2
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          body = json.loads(Path("/tmp/health.json").read_text())
+          assert body["status"] == "ok", body
+          assert body["payments_enabled"] is False, body
+          print("API health OK; live payments remain disabled")
+          PY
+          curl --fail --silent http://127.0.0.1:8000/field-lab/ | grep -q "مختبر نقاء"
+          curl --fail --silent http://127.0.0.1:8000/api-config.js | grep -q "FIELD_LAB_API_BASE"
+          echo "Field Lab frontend assets served from the API container"
