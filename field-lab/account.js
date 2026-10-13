@@ -3,6 +3,16 @@
   "use strict";
   var base = String(window.FIELD_LAB_API_BASE || "").trim().replace(/\/$/, "");
   var token = "";
+  try { token = window.sessionStorage.getItem("naqaa_field_lab_session") || ""; } catch (_) {}
+  window.FIELD_LAB_AUTH_TOKEN = token;
+  function saveToken(value) {
+    token = value || "";
+    window.FIELD_LAB_AUTH_TOKEN = token;
+    try {
+      if (token) window.sessionStorage.setItem("naqaa_field_lab_session", token);
+      else window.sessionStorage.removeItem("naqaa_field_lab_session");
+    } catch (_) {}
+  }
   var statusBox = document.getElementById("account-status");
   var usagePanel = document.getElementById("usage-panel");
   function showMessage(message, isError) {
@@ -40,19 +50,20 @@
       showMessage("جارٍ الاتصال بالخادم…");
       api(path, {method:"POST", body:JSON.stringify({email:fields.get("email"), password:fields.get("password")})})
         .then(function (data) {
-          token = data.access_token;
+          saveToken(data.access_token);
           return loadUsage();
         })
         .catch(function (error) { showMessage(error.message, true); });
     });
   }
+  window.FIELD_LAB_REFRESH_USAGE = function () { return loadUsage(); };
   auth("register-form", "/auth/register");
   auth("login-form", "/auth/login");
   var refresh = document.getElementById("refresh-usage");
   if (refresh) refresh.addEventListener("click", function () { loadUsage().catch(function (error) { showMessage(error.message, true); }); });
   var logout = document.getElementById("logout-button");
   if (logout) logout.addEventListener("click", function () {
-    token = "";
+    saveToken("");
     usagePanel.hidden = true;
     document.getElementById("login-password").value = "";
     showMessage("تم تسجيل الخروج من هذه الجلسة.");
