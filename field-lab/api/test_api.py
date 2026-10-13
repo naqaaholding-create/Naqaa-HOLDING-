@@ -144,3 +144,21 @@ def test_usage_request_id_is_idempotent():
     second = client.post("/usage/consume", headers=headers, json=payload)
     assert first.status_code == second.status_code == 200
     assert first.json()["sites_used"] == second.json()["sites_used"] == 1
+
+
+def test_concurrent_open_invoices_use_distinct_exact_amounts(monkeypatch):
+    monkeypatch.setattr("main.payments_enabled", lambda: True)
+    monkeypatch.setenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", USDT_TRON_CONTRACT)
+    token_a = register(email="first-payer@example.com")
+    token_b = register(email="second-payer@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    payer = USDT_TRON_CONTRACT
+    first = client.post("/payments/intents", headers=headers_a,
+                        json={"plan_code": "daily", "payer_address": payer})
+    second = client.post("/payments/intents", headers=headers_b,
+                         json={"plan_code": "daily", "payer_address": payer})
+    assert first.status_code == second.status_code == 201
+    assert first.json()["amount_usdt"] == "10"
+    assert second.json()["amount_usdt"] != first.json()["amount_usdt"]
+    assert second.json()["amount_usdt"].startswith("10.00000")
