@@ -1,4 +1,4 @@
-/* NAQAA Field Lab payment readiness UI. Never simulates money or claims a payment succeeded. */
+/* Verified USDT-TRC20 subscription checkout. Never simulates money. */
 (function () {
   "use strict";
   var base = String(window.FIELD_LAB_API_BASE || "").trim().replace(/\/$/, "");
@@ -7,66 +7,168 @@
   var ledgerEl = document.getElementById("wallet-ledger");
   var noticeEl = document.getElementById("wallet-notice");
   var statusEl = document.getElementById("wallet-status-label");
-  if (!balanceEl || !ledgerEl || !noticeEl) return;
+  var intentId = "";
+  var receivingAddress = "";
+  var instructions = document.getElementById("payment-instructions");
+  if (!balanceEl || !accountEl || !ledgerEl || !noticeEl || !statusEl) return;
 
-  function message(text) { noticeEl.textContent = text; }
-  function showUnconfigured() {
-    statusEl.textContent = "بانتظار الإعداد";
-    accountEl.textContent = "لم يتم نشر الخادم المالي أو ضبط عنوان الاستقبال";
-    balanceEl.textContent = "غير متاح";
-    ledgerEl.textContent = "";
-    var p = document.createElement("p");
-    p.className = "helper";
-    p.textContent = "سيظهر هنا سجل المعاملات بعد ربط خادم آمن والتحقق من المعاملات على شبكة TRON.";
-    ledgerEl.appendChild(p);
+  function message(value) { noticeEl.textContent = value; }
+  function authHeaders() {
+    var token = String(window.FIELD_LAB_AUTH_TOKEN || "");
+    if (!token) throw new Error("سجّل الدخول أولًا قبل شراء باقة.");
+    return { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Accept": "application/json" };
   }
-  function readStatus() {
-    if (!base) {
-      showUnconfigured();
-      message("زر الفحص يعمل: عنوان الخادم غير مضبوط في api-config.js. لم تُرسل أي بيانات مالية.");
-      return Promise.resolve(false);
-    }
-    return fetch(base + "/payments/status", { headers: { "Accept": "application/json" } })
-      .then(function (response) {
-        return response.json().catch(function () { return {}; }).then(function (data) {
-          if (!response.ok) throw new Error(data.detail || "تعذر قراءة حالة الدفع.");
-          statusEl.textContent = data.payments_enabled ? "جاهز للدفع" : "غير مفعّل";
-          accountEl.textContent = data.receive_address_configured ? "عنوان استقبال موجود — التحقق المالي غير مكتمل" : "عنوان استقبال SafePal غير مضبوط";
-          balanceEl.textContent = "غير متاح";
-          ledgerEl.textContent = "";
-          var p = document.createElement("p");
-          p.className = "helper";
-          p.textContent = data.note || "لم يتم تفعيل أي معاملة مالية.";
-          ledgerEl.appendChild(p);
-          message("تم فحص الخادم. لا تعتبر أي دفعة ناجحة إلا بعد التحقق على الشبكة وتأكيدها من الخادم.");
-          return Boolean(data.payments_enabled);
-        });
-      })
-      .catch(function () {
-        showUnconfigured();
-        message("تعذر الاتصال بنقطة حالة المدفوعات. لم يتم إنشاء معاملة أو تغيير أي رصيد.");
-        return false;
+  function request(path, options) {
+    if (!base) return Promise.reject(new Error("عنوان الخادم غير مضبوط. لا ترسل أي مبلغ."));
+    options = options || {};
+    options.headers = Object.assign({ "Accept": "application/json" }, options.headers || {});
+    return fetch(base + path, options).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok) throw new Error(data.detail || "تعذر إكمال الطلب.");
+        return data;
       });
+    });
   }
-
-  document.getElementById("wallet-deposit-request").addEventListener("click", function () {
-    if (!base) {
-      message("الإيداع الحقيقي لم يُفعّل: يجب نشر API عبر HTTPS وضبط عنوان استقبال SafePal العام لشبكة TRON (TRC20) والتحقق من المعاملات على الخادم أولًا.");
+  function initialState() {
+    balanceEl.textContent = "غير مؤكدة";
+    statusEl.textContent = "غير جاهز";
+    accountEl.textContent = base ? "فحص إعدادات الدفع" : "عنوان الخادم غير مضبوط";
+  }
+  function refreshStatus() {
+    return request("/payments/status").then(function (data) {
+      window.FIELD_LAB_PAYMENTS_ENABLED = data.payments_enabled === true;
+      statusEl.textContent = data.payments_enabled ? "الدفع متاح" : "الدفع مغلق";
+      accountEl.textContent = data.payments_enabled ? "USDT على TRON (TRC20)" : "إعدادات الإنتاج غير مكتملة";
+      message(data.note || (data.payments_enabled
+        ? "الخادم جاهز. أنشئ طلب الدفع قبل التحويل."
+        : "الدفع مغلق. لا ترسل أي مبلغ."));
+      return Boolean(data.payments_enabled);
+    }).catch(function () {
+      window.FIELD_LAB_PAYMENTS_ENABLED = false;
+      initialState();
+      message("تعذر الاتصال بالخادم. لم يتم إنشاء أي طلب دفع.");
+      return false;
+    });
+  }
+  function showInvoice(data) {
+    intentId = data.intent_id;
+    receivingAddress = data.receive_address;
+    document.getElementById("payment-amount").textContent = data.amount_usdt + " USDT";
+    document.getElementById("payment-receiving-address").value = receivingAddress;
+    document.getElementById("payment-expiry").textContent =
+      "تنتهي صلاحية الطلب: " + new Date(data.expires_at).toLocaleString() +
+      ". يلزم 20 تأكيدًا على الأقل على شبكة TRON.";
+    instructions.hidden = false;
+    message("أنشأ الخادم طلب الدفع. تحقق بنفسك من العنوان والمبلغ والشبكة قبل الإرسال.");
+    instructions.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  function createInvoice() {
+    var headers;
+    try { headers = authHeaders(); } catch (error) { message(error.message); return; }
+    if (!window.FIELD_LAB_PAYMENTS_ENABLED) {
+      refreshStatus().then(function (ready) {
+        if (ready) createInvoice();
+        else message("الدفع الحقيقي غير متاح بعد؛ لم يُنشأ طلب ولم يُخصم أي مبلغ.");
+      });
       return;
     }
-    readStatus().then(function (enabled) {
-      if (!enabled) message("الإيداع غير متاح بعد. لا ترسل USDT الآن؛ يحتاج النظام إلى عنوان استقبال موثّق والتحقق الآلي أو مراجعة إدارية آمنة للمعاملة.");
-      else message("الخادم يعلن أن الدفع متاح. اتبع تعليمات الإيداع التي يعرضها الخادم، وتأكد من الشبكة والمبلغ قبل الإرسال.");
+    message("جارٍ إنشاء طلب الدفع على الخادم…");
+    request("/payments/intents", {
+      method: "POST", headers: headers,
+      body: JSON.stringify({ plan_code: document.getElementById("payment-plan").value })
+    }).then(showInvoice).catch(function (error) { message(error.message); });
+  }
+  function verifyInvoice() {
+    var txid = document.getElementById("payment-txid").value.trim();
+    if (!intentId) { message("أنشئ طلب دفع قبل التحقق."); return; }
+    if (!/^[0-9a-fA-F]{64}$/.test(txid)) {
+      message("أدخل معرّف معاملة TRON الصحيح المكوّن من 64 خانة.");
+      return;
+    }
+    var headers;
+    try { headers = authHeaders(); } catch (error) { message(error.message); return; }
+    message("التحقق من المبلغ والعنوان وعقد USDT والتأكيدات على الشبكة…");
+    request("/payments/verify", {
+      method: "POST", headers: headers,
+      body: JSON.stringify({ intent_id: intentId, txid: txid })
+    }).then(function (data) {
+      if (data.status !== "confirmed") throw new Error("لم يصل تأكيد صحيح من الخادم.");
+      balanceEl.textContent = "الاشتراك مؤكد";
+      statusEl.textContent = "تم التفعيل";
+      accountEl.textContent = data.plan_label || data.plan;
+      message(data.already_processed
+        ? "هذه المعاملة مؤكدة مسبقًا ولم تُحتسب مرة ثانية."
+        : "تحقق الخادم من المعاملة وفعّل الاشتراك. التأكيدات: " + data.confirmations + ".");
+      try {
+        if (window.FIELD_LAB_REFRESH_USAGE) Promise.resolve(window.FIELD_LAB_REFRESH_USAGE()).catch(function () {});
+      } catch (_) {}
+      document.getElementById("payment-txid").value = "";
+      loadHistory();
+    }).catch(function (error) {
+      message(error.message + " لم يُفعّل الاشتراك.");
     });
-  });
+  }
+  function loadHistory() {
+    var headers;
+    try { headers = authHeaders(); } catch (error) { message(error.message); return; }
+    request("/payments/history", { headers: headers }).then(function (data) {
+      ledgerEl.textContent = "";
+      if (!data.transactions || !data.transactions.length) {
+        var empty = document.createElement("p");
+        empty.className = "helper";
+        empty.textContent = "لا توجد طلبات دفع سابقة لهذا الحساب.";
+        ledgerEl.appendChild(empty);
+        return;
+      }
+      data.transactions.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "wallet-ledger-row";
+        var info = document.createElement("div");
+        var title = document.createElement("strong");
+        title.textContent = item.plan_label + " — " + item.amount_usdt + " USDT";
+        var detail = document.createElement("small");
+        detail.textContent = item.status === "paid" ? "مدفوع ومؤكد على الشبكة" :
+          item.status === "expired" ? "انتهت صلاحية الطلب" : "بانتظار التحقق من المعاملة";
+        info.appendChild(title);
+        info.appendChild(detail);
+        row.appendChild(info);
+        var tag = document.createElement("span");
+        tag.className = "wallet-amount";
+        tag.textContent = item.status === "paid" ? "مؤكد" : item.status === "expired" ? "منتهي" : "معلّق";
+        row.appendChild(tag);
+        if (item.status === "pending") {
+          var resume = document.createElement("button");
+          resume.type = "button";
+          resume.className = "button button-secondary button-small";
+          resume.textContent = "استكمال الدفع";
+          resume.addEventListener("click", function () {
+            document.getElementById("payment-plan").value = item.plan_code;
+            request("/payments/intents", {
+              method: "POST", headers: headers,
+              body: JSON.stringify({ plan_code: item.plan_code })
+            }).then(showInvoice).catch(function (error) { message(error.message); });
+          });
+          row.appendChild(resume);
+        }
+        ledgerEl.appendChild(row);
+      });
+    }).catch(function (error) { message(error.message); });
+  }
 
-  document.getElementById("wallet-withdraw-request").addEventListener("click", function () {
-    message("السحب الحقيقي غير مفعّل بعد. يلزم رصيد مؤكد في سجل مالي على الخادم، وتسجيل طلب السحب، ومراجعة إدارية، وتنفيذ آمن دون وضع المفتاح الخاص لمحفظة SafePal داخل التطبيق.");
+  document.getElementById("wallet-deposit-request").addEventListener("click", createInvoice);
+  document.getElementById("wallet-verify-payment").addEventListener("click", verifyInvoice);
+  document.getElementById("wallet-copy-address").addEventListener("click", function () {
+    if (!receivingAddress) { message("أنشئ طلب دفع أولًا حتى يظهر العنوان من الخادم."); return; }
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      message("تعذر النسخ التلقائي. حدّد عنوان الاستقبال وانسخه يدويًا.");
+      return;
+    }
+    navigator.clipboard.writeText(receivingAddress).then(function () {
+      message("نُسخ العنوان. تأكد من USDT على شبكة TRON (TRC20) والمبلغ المحدد.");
+    }).catch(function () { message("تعذر النسخ. انسخ العنوان يدويًا."); });
   });
-
-  document.getElementById("wallet-refresh").addEventListener("click", function () {
-    readStatus();
-  });
-
-  showUnconfigured();
+  document.getElementById("wallet-refresh").addEventListener("click", refreshStatus);
+  document.getElementById("wallet-history").addEventListener("click", loadHistory);
+  initialState();
+  refreshStatus();
 }());
