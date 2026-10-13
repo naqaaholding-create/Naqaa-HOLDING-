@@ -24,7 +24,7 @@
   }
   function loadUsage() {
     return api("/me/usage").then(function (data) {
-      document.getElementById("usage-plan").textContent = data.plan_label + " — " + data.price_usd + " دولار (عرض معلوماتي؛ الدفع غير مفعّل)";
+      document.getElementById("usage-plan").textContent = data.plan_label + " — " + data.price_usd + " دولار";
       document.getElementById("sites-usage").textContent = data.sites_used + " / " + data.sites_limit;
       document.getElementById("questions-usage").textContent = data.questions_used + " / " + data.questions_limit;
       usagePanel.hidden = false;
@@ -56,6 +56,41 @@
     usagePanel.hidden = true;
     document.getElementById("login-password").value = "";
     showMessage("تم تسجيل الخروج من هذه الجلسة.");
+  });
+
+  function startPayment(plan) {
+    if (!token) { showMessage("سجّل الدخول أولًا قبل إنشاء طلب الدفع.", true); return; }
+    showMessage("جارٍ إنشاء طلب الدفع…");
+    api("/payments/create", {method:"POST", body:JSON.stringify({plan:plan})}).then(function (data) {
+      var box = document.getElementById("payment-panel");
+      var details = document.getElementById("payment-details");
+      var idField = document.getElementById("payment-id");
+      if (box && details && idField) {
+        idField.value = data.payment_id;
+        details.textContent = "حوّل " + data.amount + " USDT عبر شبكة TRON (TRC20) إلى " + data.receive_address + " ثم أدخل معرّف المعاملة أدناه. لا ترسل مبلغًا مختلفًا.";
+        box.hidden = false;
+        box.scrollIntoView({behavior:"smooth", block:"center"});
+      }
+      showMessage("تم إنشاء طلب دفع. الاشتراك لن يتفعّل إلا بعد تأكيد التحويل على الشبكة.");
+    }).catch(function (error) { showMessage(error.message, true); });
+  }
+  document.querySelectorAll(".plan-buy").forEach(function (button) {
+    button.addEventListener("click", function () { startPayment(button.getAttribute("data-plan-code")); });
+  });
+  var confirmForm = document.getElementById("payment-confirm-form");
+  if (confirmForm) confirmForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (!token) { showMessage("سجّل الدخول أولًا.", true); return; }
+    var paymentId = Number(document.getElementById("payment-id").value);
+    var txid = String(document.getElementById("payment-txid").value || "").trim();
+    showMessage("جارٍ التحقق من معاملة TRON المؤكدة…");
+    api("/payments/confirm", {method:"POST", body:JSON.stringify({payment_id:paymentId, txid:txid})})
+      .then(function (data) {
+        showMessage("تم تأكيد الدفع وتفعيل باقة " + data.plan + " بنجاح.");
+        document.getElementById("payment-panel").hidden = true;
+        confirmForm.reset();
+        return loadUsage();
+      }).catch(function (error) { showMessage(error.message, true); });
   });
   if (base) showMessage("عنوان الخادم مضبوط. استخدم حسابًا تجريبيًا ولا تدخل بيانات حساسة حتى تكتمل مراجعة النشر.");
 }());
