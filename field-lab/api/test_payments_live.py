@@ -74,7 +74,7 @@ class TestMainnetPaymentVerifier(unittest.TestCase):
             {"block_header": {"raw_data": {"number": 120}}},
         ]
         with self.assertRaises(PaymentVerificationError):
-            verify_usdt_transfer(self.txid, receiving_address=self.recipient, expected_amount_base_units=self.amount)
+            verify_usdt_transfer(self.txid, receiving_address=self.recipient, payer_address=self.sender, expected_amount_base_units=self.amount)
 
     @patch("payments_live._request_json")
     def test_rejects_wrong_payer(self, request_json):
@@ -95,7 +95,7 @@ class TestMainnetPaymentVerifier(unittest.TestCase):
             {"block_header": {"raw_data": {"number": 120}}},
         ]
         with self.assertRaises(PaymentVerificationError):
-            verify_usdt_transfer(self.txid, receiving_address=self.recipient, expected_amount_base_units=self.amount)
+            verify_usdt_transfer(self.txid, receiving_address=self.recipient, payer_address=self.sender, expected_amount_base_units=self.amount)
 
     @patch("payments_live._request_json")
     def test_rejects_insufficient_confirmations(self, request_json):
@@ -104,7 +104,7 @@ class TestMainnetPaymentVerifier(unittest.TestCase):
             {"block_header": {"raw_data": {"number": 101}}},
         ]
         with self.assertRaises(PaymentVerificationError):
-            verify_usdt_transfer(self.txid, receiving_address=self.recipient, expected_amount_base_units=self.amount)
+            verify_usdt_transfer(self.txid, receiving_address=self.recipient, payer_address=self.sender, expected_amount_base_units=self.amount)
 
     def test_rejects_invalid_recipient(self):
         with self.assertRaises(PaymentVerificationError):
