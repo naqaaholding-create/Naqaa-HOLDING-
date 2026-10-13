@@ -59,3 +59,10 @@ After provisioning:
 5. Do not ask customers to send payment until the frontend displays the verified receiving address and exact current invoice amount. Do not test with a real transfer; use mocked tests first.
 
 The Render Blueprint cannot infer the unique URL assigned to your account before you apply it, so `field-lab/api-config.js` intentionally remains blank until that URL exists.
+
+
+## Signed Android production build
+
+The manual release workflow `.github/workflows/field-lab-signed-android-release.yml` also requires a GitHub Actions secret named `FIELD_LAB_API_BASE`. Set it to the actual HTTPS origin assigned to the deployed Render service, without a path or trailing slash. This is injected into the app's packaged `api-config.js`, so Android uses the remote API instead of its local WebView origin. It is a public service URL, not a private key.
+
+Keep the Android signing keystore and passwords in these repository Actions secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Do not store these values in source code or this chat.
