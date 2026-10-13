@@ -4,11 +4,14 @@ from __future__ import annotations
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Generator, Literal
 
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from pwdlib import PasswordHash
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, create_engine, select, text
@@ -554,3 +557,13 @@ def consume(payload: ConsumeInput, user: User = Depends(current_user), db: Sessi
 @app.get("/me")
 def get_me(user: User = Depends(current_user)) -> dict:
     return {"id": user.id, "email": user.email, "plan": active_plan(user), "created_at": user.created_at}
+
+# Serve the web app and API from the same origin in the production container.
+# In API-only unit tests the frontend directory is absent, so this mount is skipped.
+STATIC_SITE_DIR = Path(os.getenv("FIELD_LAB_STATIC_DIR", str(Path(__file__).resolve().parent / "static" / "field-lab")))
+if STATIC_SITE_DIR.is_dir():
+    app.mount("/field-lab", StaticFiles(directory=str(STATIC_SITE_DIR), html=True), name="field-lab")
+
+    @app.get("/", include_in_schema=False)
+    def field_lab_home() -> RedirectResponse:
+        return RedirectResponse(url="/field-lab/", status_code=307)
