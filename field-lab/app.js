@@ -360,7 +360,30 @@
           stopCamera();
           return renderRecords();
         })
-        .then(function () { toast("تم حفظ السجل على هذا الجهاز فقط."); })
+        .then(function () {
+          if (!apiBase || !authToken) {
+            toast("تم حفظ السجل على هذا الجهاز فقط.");
+            return;
+          }
+          var cloudRecord = Object.assign({}, record, {
+            photos: (record.photos || []).map(function (photo) {
+              return { name: String(photo.name || "صورة ميدانية"), type: String(photo.type || "image/jpeg") };
+            }),
+            storage: "cloud-metadata-local-photos"
+          });
+          return fetch(apiBase + "/records", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + authToken, "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify(cloudRecord)
+          }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+              if (!response.ok) throw new Error(data.detail || "تعذرت مزامنة بيانات السجل.");
+              toast("حُفظ السجل محليًا ومُزامنة بياناته الوصفية. الصور ما زالت على هذا الجهاز.");
+            });
+          }).catch(function () {
+            toast("حُفظ السجل محليًا، لكن تعذرت مزامنته مع الخادم. احتفظ بنسخة JSON احتياطية.");
+          });
+        })
         .catch(function (error) {
           toast(error && error.name === "QuotaExceededError" ? "مساحة التخزين ممتلئة. صدّر سجلاتك واحذف الصور الكبيرة." : "تعذر الحفظ. قد تكون مساحة المتصفح ممتلئة.");
           throw error;
