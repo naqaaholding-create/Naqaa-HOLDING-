@@ -5,12 +5,13 @@ This is a separate Cloudflare implementation for NAQAA Field Lab. It does not re
 ## Included
 - Serves the existing `field-lab/` static app from Worker Assets.
 - Implements `/health`, `/plans`, `/auth/register`, `/auth/login`, `/me`, `/me/usage`, and `/usage/consume`.
-- Stores accounts and usage in Cloudflare D1.
+- Stores accounts, usage, and authenticated field-record metadata in Cloudflare D1.
+- Exposes authenticated `GET /records`, `POST /records`, and `DELETE /records/{id}` endpoints; record metadata sync is separate from local browser storage.
 - Uses Web Crypto PBKDF2-SHA256 password hashing and HMAC-SHA256 JWTs.
 - All payment endpoints remain hard-disabled and return no live invoice. Never send real funds.
 
 ## Important status
-This is a deployment scaffold, not a production approval. It must pass runtime tests before public use. Email verification, password reset, rate limiting, monitoring, and security review are still needed. Existing records/photos remain in browser IndexedDB; this API does not upload or sync them.
+This is a deployment scaffold, not a production approval. It must pass runtime tests before public use. Email verification, password reset, rate limiting, monitoring, and security review are still needed. Field record metadata can be synced after login, but image files remain in browser IndexedDB and are not uploaded to cloud storage yet. Do not uninstall/clear the browser or change devices expecting photos to follow. Photo sync requires a separately configured object-storage layer and must be tested before production use.
 
 ## Set up once in Cloudflare
 1. Create a D1 database named `naqaa-field-lab-db` in the Cloudflare dashboard.
