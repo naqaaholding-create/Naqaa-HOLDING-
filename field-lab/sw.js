@@ -39,8 +39,14 @@ self.addEventListener("fetch", event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  const privateOrApiPath = ["/auth/", "/me", "/records", "/usage/", "/payments/", "/plans", "/health"]
+    .some(path => url.pathname === path || url.pathname.startsWith(path));
+  if (privateOrApiPath) {
+    event.respondWith(fetch(request));
+    return;
+  }
   event.respondWith(fetch(request).then(response => {
-    if (response.ok && response.type === "basic") {
+    if (response.ok && response.type === "basic" && response.headers.get("Cache-Control") !== "no-store") {
       const copy = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {});
     }
