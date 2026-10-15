@@ -2,6 +2,12 @@ name: Deploy NAQAA Field Lab to Cloudflare
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - cloudflare-d1-api-setup
+    paths:
+      - "field-lab/cloudflare/**"
+      - ".github/workflows/deploy-field-lab-cloudflare.yml"
 
 permissions:
   contents: read
@@ -12,6 +18,8 @@ concurrency:
 
 jobs:
   deploy:
+    # A branch push deploys only when its commit message explicitly includes [deploy].
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
