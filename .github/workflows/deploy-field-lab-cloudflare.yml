@@ -72,6 +72,9 @@ jobs:
 
       - name: Apply database schema
         run: wrangler d1 execute naqaa-field-lab-db --remote --file=field-lab/cloudflare/schema.sql --config=field-lab/cloudflare/wrangler.deploy.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy Worker
         run: wrangler deploy --config=field-lab/cloudflare/wrangler.deploy.jsonc
