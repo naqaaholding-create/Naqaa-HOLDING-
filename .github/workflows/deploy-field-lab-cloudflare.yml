@@ -93,11 +93,17 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Smoke test API
+      - name: Discover workers.dev URL
+        id: url
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          base="https://naqaa-field-lab-api.${{ vars.CLOUDFLARE_ACCOUNT_SUBDOMAIN }}"
-          echo "Deployment completed. Check the Worker URL in Cloudflare if your account uses a different workers.dev subdomain."
-          curl --fail-with-body --silent --show-error "$base/health"
+          response="$(curl --fail-with-body --silent --show-error "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")"
+          subdomain="$(printf '%s' "$response" | jq -r '.result.subdomain // empty')"
+          test -n "$subdomain" || { echo "::error::Cloudflare workers.dev subdomain is not configured for this account."; exit 1; }
+          echo "base_url=https://naqaa-field-lab-api.$subdomain.workers.dev" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test API
+        run: curl --fail-with-body --silent --show-error "${{ steps.url.outputs.base_url }}/health"
