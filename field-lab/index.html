@@ -248,17 +248,18 @@
         <div><p class="eyebrow">APP DISTRIBUTION</p><h2>مشاركة مختبر نقاء وتثبيته</h2></div>
         <span class="step">05</span>
       </div>
-      <p class="distribution-intro">شارك رابط النسخة المنشورة عبر التطبيقات، أو انقل ملف APK بين أجهزة Android. يجب نشر رابط HTTPS فعلي أولًا؛ رابط المعاينة المحلية لا يصلح للمشاركة.</p>
+      <p class="distribution-intro">شارك رابط HTTPS للنسخة المنشورة، أو ثبّت التطبيق كتطبيق ويب قابل للتثبيت (PWA) على الأجهزة المدعومة. هذه النسخة لا تتضمن ملف APK أصليًا.</p>
       <div class="share-buttons">
         <button type="button" class="button button-primary" id="native-share-button">مشاركة الرابط من الهاتف</button>
+        <button type="button" class="button button-secondary" id="install-app-button" hidden>تثبيت التطبيق على الهاتف</button>
         <button type="button" class="button button-secondary" id="copy-share-link">نسخ رابط التطبيق</button>
         <a class="button button-secondary" id="whatsapp-share" href="https://wa.me/" target="_blank" rel="noopener noreferrer">WhatsApp</a>
         <a class="button button-secondary" id="telegram-share" href="https://t.me/share/url" target="_blank" rel="noopener noreferrer">Telegram</a>
         <a class="button button-secondary" id="facebook-share" href="https://www.facebook.com/sharer/sharer.php" target="_blank" rel="noopener noreferrer">Facebook</a>
       </div>
       <div class="distribution-notes">
-        <div><strong>Bluetooth أو Quick Share</strong><p>بعد تنزيل ملف APK النهائي إلى هاتف Android، افتح تطبيق «الملفات» أو «التنزيلات»، اختر ملف APK، ثم «مشاركة» واختر Bluetooth أو Quick Share. قد يلزم السماح بتثبيت التطبيقات من هذا المصدر على جهاز المستلم.</p></div>
-        <div><strong>قبل التثبيت</strong><p>لا تثبّت ملفًا إلا إذا كان من رابط رسمي موثوق. نسخة Debug للتجربة وليست إصدارًا نهائيًا للمتاجر. قد تظهر تحذيرات أمان عند تثبيت APK خارج المتجر.</p></div>
+        <div><strong>Bluetooth أو Quick Share</strong><p>اضغط «مشاركة الرابط من الهاتف» ثم اختر Quick Share أو Bluetooth إذا ظهرا في قائمة المشاركة على جهازك. هذا يرسل رابط التطبيق، وليس ملف APK. يمكن للمستلم فتح الرابط وتثبيت نسخة PWA من المتصفح إذا كان جهازه يدعم ذلك.</p></div>
+        <div><strong>حالة التوزيع</strong><p>التثبيت الحالي كتطبيق ويب يحتاج رابط HTTPS منشورًا. لا يوجد APK أصلي موقّع في هذا المستودع حاليًا؛ نشر APK يتطلب مشروع Android وبناءً وتوقيعًا منفصلًا.</p></div>
       </div>
       <p class="helper" id="share-status" role="status" aria-live="polite">روابط المشاركة ستستخدم عنوان الصفحة الحالية. لا يظهر رابط تنزيل APK هنا إلا بعد نجاح البناء ونشر الملف في مكان متاح.</p>
     </section>
