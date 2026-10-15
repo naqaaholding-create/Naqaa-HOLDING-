@@ -30,6 +30,9 @@ jobs:
       - name: Check Worker JavaScript syntax
         run: node --check field-lab/cloudflare/src/index.js
 
+      - name: Run API smoke tests
+        run: node --test field-lab/cloudflare/test/worker.test.mjs
+
       - name: Install Wrangler
         run: npm install --global wrangler
 
