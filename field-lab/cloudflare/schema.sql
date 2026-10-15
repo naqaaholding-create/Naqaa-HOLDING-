@@ -25,3 +25,16 @@ CREATE TABLE IF NOT EXISTS field_lab_usage_receipts (
 
 CREATE INDEX IF NOT EXISTS idx_field_lab_users_email ON field_lab_users(email);
 CREATE INDEX IF NOT EXISTS idx_field_lab_usage_receipts_user ON field_lab_usage_receipts(user_id);
+
+CREATE TABLE IF NOT EXISTS field_lab_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES field_lab_users(id) ON DELETE CASCADE,
+  record_id TEXT NOT NULL,
+  record_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (user_id, record_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_field_lab_records_user_updated
+  ON field_lab_records(user_id, updated_at DESC);
