@@ -2,11 +2,6 @@ name: Deploy NAQAA Field Lab to Cloudflare
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - cloudflare-d1-api-setup
-    paths:
-      - "field-lab/cloudflare/**"
 
 permissions:
   contents: read
