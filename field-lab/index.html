@@ -6,6 +6,10 @@
   <meta name="theme-color" content="#173f35">
   <meta name="description" content="NAQAA Field Lab — سجل ميداني للمواقع والصور والإحداثيات وبيانات المسح.">
   <title>NAQAA Field Lab | مختبر نقاء الميداني</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="مختبر نقاء">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="navigation.css">
   <link rel="stylesheet" href="subscriptions.css">
@@ -349,5 +353,12 @@
   <script src="wallet.js"></script>
   <script src="research-analysis.js"></script>
   <script src="terrain-profile.js"></script>
+  <script>
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./sw.js").catch(function () {});
+      });
+    }
+  </script>
 </body>
 </html>
