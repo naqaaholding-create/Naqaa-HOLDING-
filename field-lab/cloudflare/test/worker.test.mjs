@@ -64,3 +64,13 @@ test("unknown API routes return 404 rather than serving the app shell", async ()
   const response = await call("/auth/not-a-route", { method: "POST" });
   assert.equal(response.status, 404);
 });
+
+test("records endpoint requires authentication", async () => {
+  const response = await call("/records");
+  assert.equal(response.status, 401);
+});
+
+test("record routes are included in the API router", async () => {
+  const response = await call("/records", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  assert.equal(response.status, 401);
+});
