@@ -163,6 +163,62 @@ async function api(request, env) {
     return json({ access_token: await makeToken(user.id, env), token_type: "bearer" });
   }
 
+  if (path === "/records" || path.startsWith("/records/")) {
+    const user = await getUser(request, env);
+    if (!user) return fail("يلزم تسجيل الدخول أو رمز الدخول غير صالح أو منتهي", 401);
+    if (method === "GET" && path === "/records") {
+      const result = await env.DB.prepare(
+        "SELECT record_id, record_json, created_at, updated_at FROM field_lab_records WHERE user_id=? ORDER BY updated_at DESC LIMIT 500"
+      ).bind(user.id).all();
+      return json({ records: (result.results || []).map(row => {
+        try { return JSON.parse(row.record_json); } catch (_) { return null; }
+      }).filter(Boolean), limit: 500, photos_synced: false });
+    }
+    if (method === "POST" && path === "/records") {
+      const body = await bodyJson(request);
+      if (!body || typeof body !== "object" || Array.isArray(body) ||
+          typeof body.id !== "string" || !/^[A-Za-z0-9_-]{8,100}$/.test(body.id) ||
+          typeof body.siteName !== "string" || !body.siteName.trim() || body.siteName.length > 100 ||
+          typeof body.type !== "string" || body.type.length > 50 ||
+          !Number.isFinite(body.createdAt) ||
+          (body.latitude != null && (!Number.isFinite(body.latitude) || body.latitude < -90 || body.latitude > 90)) ||
+          (body.longitude != null && (!Number.isFinite(body.longitude) || body.longitude < -180 || body.longitude > 180)) ||
+          ((body.latitude == null) !== (body.longitude == null)) ||
+          (body.notes != null && (typeof body.notes !== "string" || body.notes.length > 5000)) ||
+          (body.measurements != null && (typeof body.measurements !== "string" || body.measurements.length > 3000)) ||
+          (body.coordinateSource != null && (typeof body.coordinateSource !== "string" || body.coordinateSource.length > 500)) ||
+          (body.photos != null && (!Array.isArray(body.photos) || body.photos.length > 6 ||
+            body.photos.some(photo => !photo || typeof photo.name !== "string" || photo.name.length > 200 ||
+              typeof photo.type !== "string" || photo.type.length > 100 || Object.prototype.hasOwnProperty.call(photo, "data"))))) {
+        return fail("بيانات السجل غير صحيحة. تُرفع بيانات السجل الوصفية فقط؛ الصور تبقى محليًا في هذه النسخة.", 422);
+      }
+      const record = {
+        id: body.id, siteName: body.siteName.trim(), type: body.type,
+        latitude: body.latitude == null ? null : body.latitude,
+        longitude: body.longitude == null ? null : body.longitude,
+        coordinateSource: String(body.coordinateSource || "").slice(0, 500),
+        notes: String(body.notes || ""), measurements: String(body.measurements || ""),
+        photos: (body.photos || []).map(photo => ({ name: photo.name, type: photo.type })),
+        createdAt: body.createdAt, appVersion: String(body.appVersion || "0.1.0"),
+        storage: "cloud-metadata-local-photos"
+      };
+      const serialized = JSON.stringify(record);
+      if (enc.encode(serialized).length > 240000) return fail("حجم بيانات السجل أكبر من الحد المسموح.", 413);
+      const now = nowIso();
+      await env.DB.prepare(
+        "INSERT INTO field_lab_records (user_id,record_id,record_json,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id,record_id) DO UPDATE SET record_json=excluded.record_json,updated_at=excluded.updated_at"
+      ).bind(user.id, record.id, serialized, new Date(record.createdAt).toISOString(), now).run();
+      return json({ saved: true, record_id: record.id, photos_synced: false }, 201);
+    }
+    if (method === "DELETE" && path.startsWith("/records/")) {
+      const recordId = decodeURIComponent(path.slice("/records/".length));
+      if (!/^[A-Za-z0-9_-]{8,100}$/.test(recordId)) return fail("معرّف السجل غير صحيح.", 422);
+      const result = await env.DB.prepare("DELETE FROM field_lab_records WHERE user_id=? AND record_id=?").bind(user.id, recordId).run();
+      if (!result.meta?.changes) return fail("السجل غير موجود.", 404);
+      return json({ deleted: true, record_id: recordId });
+    }
+  }
+
   if (path === "/me" || path === "/me/usage" || path === "/usage/consume") {
     const user = await getUser(request, env);
     if (!user) return fail("يلزم تسجيل الدخول أو رمز الدخول غير صالح أو منتهي", 401);
@@ -212,7 +268,7 @@ async function api(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const apiPaths = ["/health", "/plans", "/auth/", "/me", "/usage/", "/payments/"];
+    const apiPaths = ["/health", "/plans", "/auth/", "/me", "/usage/", "/records", "/payments/"];
     if (apiPaths.some(prefix => url.pathname === prefix || url.pathname.startsWith(prefix))) {
       if (request.method === "OPTIONS") return new Response(null, { status: 204 });
       try { return await api(request, env); }
