@@ -49,14 +49,14 @@ jobs:
           fi
           node <<'NODE'
           const fs = require("node:fs");
-          const base = String(process.env.FIELD_LAB_API_BASE || "").trim().replace(/\\/+$/, "");
+          const base = String(process.env.FIELD_LAB_API_BASE || "").trim().replace(/\/+$/, "");
           if (!/^https:\/\//i.test(base)) {
             console.error("FIELD_LAB_API_BASE must be an HTTPS URL.");
             process.exit(1);
           }
           const file = "www/api-config.js";
           const source = fs.readFileSync(file, "utf8");
-          fs.writeFileSync(file, "window.FIELD_LAB_API_BASE_OVERRIDE = " + JSON.stringify(base) + ";\\n" + source);
+          fs.writeFileSync(file, "window.FIELD_LAB_API_BASE_OVERRIDE = " + JSON.stringify(base) + ";\n" + source);
           console.log("Configured Android API base URL.");
           NODE
       - name: Add Android platform
