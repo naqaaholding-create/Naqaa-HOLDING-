@@ -72,6 +72,80 @@
     });
   }
 
+  function apiSettings() {
+    return {
+      base: String(window.FIELD_LAB_API_BASE || "").trim().replace(/\/$/, ""),
+      token: String(window.FIELD_LAB_AUTH_TOKEN || "")
+    };
+  }
+
+  function cloudRequest(path, options) {
+    var settings = apiSettings();
+    if (!settings.base || !settings.token) return Promise.reject(new Error("يلزم ضبط الخادم وتسجيل الدخول للمزامنة."));
+    options = options || {};
+    options.headers = Object.assign({
+      "Authorization": "Bearer " + settings.token,
+      "Accept": "application/json"
+    }, options.headers || {});
+    return fetch(settings.base + path, options).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok) throw new Error(data.detail || "تعذرت مزامنة السجل.");
+        return data;
+      });
+    });
+  }
+
+  function saveLocalRecord(record) {
+    return transact("readwrite", function (store) { return store.put(record); });
+  }
+
+  function syncOneCloudRecord(record) {
+    var copy = Object.assign({}, record, { storage: "cloud" });
+    // Idempotent quota receipt prevents offline records from bypassing account limits.
+    return cloudRequest("/usage/consume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "site", request_id: String(copy.id) })
+    }).then(function () {
+      return cloudRequest("/records/" + encodeURIComponent(copy.id), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record: copy })
+      });
+    }).then(function () {
+      return saveLocalRecord(copy).then(function () { return copy; });
+    });
+  }
+
+  function syncCloudRecords() {
+    var settings = apiSettings();
+    if (!settings.base || !settings.token || !db) return Promise.resolve({ skipped: true });
+    return allRecords().then(function (localRecords) {
+      return localRecords.reduce(function (chain, record) {
+        return chain.then(function () { return syncOneCloudRecord(record); });
+      }, Promise.resolve());
+    }).then(function () {
+      return cloudRequest("/records", { method: "GET" });
+    }).then(function (response) {
+      var remoteRecords = Array.isArray(response.records) ? response.records : [];
+      return allRecords().then(function (localRecords) {
+        var localIds = new Set(localRecords.map(function (record) { return String(record.id); }));
+        return remoteRecords.reduce(function (chain, record) {
+          return chain.then(function () {
+            if (!record || !record.id || localIds.has(String(record.id))) return;
+            record.storage = "cloud";
+            localIds.add(String(record.id));
+            return saveLocalRecord(record);
+          });
+        }, Promise.resolve()).then(function () {
+          return renderRecords().then(function () {
+            return { uploaded: localRecords.length, downloaded: remoteRecords.length };
+          });
+        });
+      });
+    });
+  }
+
   function makeId() {
     return "NQ-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
   }
@@ -360,7 +434,7 @@
           stopCamera();
           return renderRecords();
         })
-        .then(function () { toast("تم حفظ السجل على هذا الجهاز فقط."); })
+        .then(function () { return record; })
         .catch(function (error) {
           toast(error && error.name === "QuotaExceededError" ? "مساحة التخزين ممتلئة. صدّر سجلاتك واحذف الصور الكبيرة." : "تعذر الحفظ. قد تكون مساحة المتصفح ممتلئة.");
           throw error;
@@ -369,7 +443,7 @@
 
     var apiBase = String(window.FIELD_LAB_API_BASE || "").trim().replace(/\/$/, "");
     if (!apiBase) {
-      persistRecord();
+      persistRecord().then(function () { toast("تم حفظ السجل على هذا الجهاز فقط."); });
       return;
     }
     var authToken = String(window.FIELD_LAB_AUTH_TOKEN || "");
@@ -388,6 +462,14 @@
       });
     }).then(function () {
       return persistRecord();
+    }).then(function (savedRecord) {
+      return syncOneCloudRecord(savedRecord).then(function () {
+        return renderRecords().then(function () {
+          toast("تم حفظ السجل ومزامنته مع الخادم.");
+        });
+      }).catch(function (error) {
+        toast("حُفظ السجل على الجهاز، لكن المزامنة السحابية معلّقة: " + (error.message || "تحقق من الاتصال."));
+      });
     }).catch(function (error) {
       toast(error.message || "تعذر احتساب حصة الموقع على الخادم. لم يتم حفظ السجل.");
     });
@@ -436,9 +518,23 @@
     el("export-button").addEventListener("click", exportAll);
     el("clear-button").addEventListener("click", clearAll);
     window.addEventListener("beforeunload", stopCamera);
-    openDB().then(renderRecords).catch(function (error) {
+    openDB().then(function () {
+      return renderRecords().then(function () {
+        return syncCloudRecords().catch(function () {
+          // Keep the offline-first workspace usable if the network is unavailable.
+        });
+      });
+    }).catch(function (error) {
       toast(error.message || "تعذر بدء التخزين المحلي.");
     });
+    window.addEventListener("online", function () {
+      syncCloudRecords().catch(function () {
+        toast("تعذرت المزامنة الآن؛ ستبقى سجلاتك محفوظة محليًا.");
+      });
+    });
+    window.FIELD_LAB_SYNC_RECORDS = function () {
+      return syncCloudRecords();
+    };
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

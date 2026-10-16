@@ -11,6 +11,14 @@ on:
         description: Android versionName
         required: true
         default: "1.0.0"
+      release_mode:
+        description: Release with subscription payments disabled, or require live-payment readiness
+        required: true
+        type: choice
+        options:
+          - payments_disabled
+          - live_payments
+        default: payments_disabled
 
 permissions:
   contents: write
@@ -68,9 +76,10 @@ jobs:
           print("Configured the packaged Android app to use the HTTPS production API origin.")
           PY
 
-      - name: Verify live payment readiness before production release
+      - name: Verify API and payment mode before production release
         env:
           FIELD_LAB_API_BASE: ${{ secrets.FIELD_LAB_API_BASE }}
+          RELEASE_MODE: ${{ inputs.release_mode }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -87,18 +96,27 @@ jobs:
                   status = json.loads(response.read().decode("utf-8"))
           except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
               raise SystemExit(f"Production release blocked: payment readiness endpoint unavailable: {exc}")
-          if status.get("payments_enabled") is not True:
-              blockers = status.get("requirements_remaining", [])
-              print("Live payments are not ready; no public release will be created.")
-              for blocker in blockers:
-                  print(f"- {blocker}")
-              raise SystemExit(1)
-          for key in ("receive_address_configured", "chain_provider_configured", "persistent_database_configured"):
-              if status.get(key) is not True:
-                  raise SystemExit(f"Production release blocked: readiness check failed: {key}")
-          if status.get("network") != "TRON" or status.get("token") != "USDT-TRC20":
-              raise SystemExit("Production release blocked: payment network/token did not match TRON USDT-TRC20.")
-          print("Live payment status confirmed by the deployed API; continuing with signed production build.")
+          mode = os.environ.get("RELEASE_MODE", "payments_disabled")
+          enabled = status.get("payments_enabled") is True
+          if mode == "live_payments":
+              if not enabled:
+                  blockers = status.get("requirements_remaining", [])
+                  print("Live-payment release blocked; production readiness checks are incomplete.")
+                  for blocker in blockers:
+                      print(f"- {blocker}")
+                  raise SystemExit(1)
+              for key in ("receive_address_configured", "chain_provider_configured", "persistent_database_configured"):
+                  if status.get(key) is not True:
+                      raise SystemExit(f"Production release blocked: readiness check failed: {key}")
+              if status.get("network") != "TRON" or status.get("token") != "USDT-TRC20":
+                  raise SystemExit("Production release blocked: payment network/token did not match TRON USDT-TRC20.")
+              print("Live-payment readiness confirmed by the deployed API.")
+          elif mode == "payments_disabled":
+              if enabled:
+                  raise SystemExit("Payments-disabled release blocked: API currently reports live payments enabled. Disable payments on the server first.")
+              print("API is reachable and reports payments disabled; continuing with a signed release that cannot collect live subscriptions.")
+          else:
+              raise SystemExit("Unknown release_mode; refusing to publish.")
           PY
 
       - name: Generate Android project
@@ -220,7 +238,8 @@ jobs:
           name: NAQAA Field Lab v${{ inputs.version_name }}
           body: |
             Signed production build of NAQAA Field Lab.
-            The workflow verified the deployed API's live USDT-TRC20 readiness before publishing.
+            Release mode: ${{ inputs.release_mode }}.
+            Live subscription collection is included only when the selected live_payments mode passes all server readiness checks.
             APK is for direct Android installation; AAB is for Google Play submission.
           files: |
             field-lab/android/app/build/outputs/apk/release/app-release.apk

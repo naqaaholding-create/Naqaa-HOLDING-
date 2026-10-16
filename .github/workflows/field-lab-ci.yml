@@ -1,0 +1,85 @@
+name: NAQAA Field Lab CI
+
+on:
+  push:
+    branches: [main, "production/**"]
+    paths:
+      - "field-lab/**"
+      - "render.field-lab.yaml"
+      - ".github/workflows/field-lab-ci.yml"
+      - ".github/workflows/field-lab-signed-android-release.yml"
+  pull_request:
+    paths:
+      - "field-lab/**"
+      - "render.field-lab.yaml"
+      - ".github/workflows/field-lab-ci.yml"
+      - ".github/workflows/field-lab-signed-android-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: field-lab-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-tests:
+    name: API tests and Python syntax
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: field-lab/api
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: field-lab/api/requirements.txt
+
+      - name: Install API dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Install test runner dependencies
+        run: python -m pip install pytest httpx2
+
+      - name: Compile Python source
+        run: python -m compileall -q .
+
+      - name: Run API and payment-verification tests
+        run: python -m pytest -q test_api.py test_payments_live.py test_payments_testnet.py
+
+  frontend-smoke:
+    name: Frontend packaging smoke checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Validate required frontend files and safe payment defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s field-lab/index.html
+          test -s field-lab/styles.css
+          test -s field-lab/app.js
+          test -s field-lab/api-config.js
+          test -s field-lab/wallet.js
+          test -s field-lab/api/main.py
+          test -s field-lab/api/payments_live.py
+          node --check field-lab/app.js
+          node --check field-lab/account.js
+          test -s render.field-lab.yaml
+          test -s .github/workflows/field-lab-signed-android-release.yml
+          grep -q 'release_mode:' .github/workflows/field-lab-signed-android-release.yml
+          grep -q 'payments_disabled' .github/workflows/field-lab-signed-android-release.yml
+          grep -q 'live_payments' .github/workflows/field-lab-signed-android-release.yml
+          grep -q 'FIELD_LAB_LIVE_PAYMENTS_ENABLED' render.field-lab.yaml
+          grep -Eq 'value: "0"|value: 0' render.field-lab.yaml
+          grep -q 'FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS' render.field-lab.yaml
+          grep -q 'TRONGRID_API_KEY' render.field-lab.yaml
+          echo "Required Field Lab frontend/backend files exist; deployment blueprint keeps live payments disabled by default."

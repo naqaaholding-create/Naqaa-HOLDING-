@@ -1,6 +1,7 @@
 """NAQAA Field Lab API: accounts, quotas, and fail-closed verified USDT subscriptions."""
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -14,7 +15,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from pwdlib import PasswordHash
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, create_engine, select, text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, create_engine, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from payments_live import PaymentVerificationError, address_to_hex20, check_mainnet_provider, verify_usdt_transfer
@@ -66,6 +67,17 @@ class UsageReceipt(Base):
     action: Mapped[str] = mapped_column(String(20))
     request_id: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class FieldRecord(Base):
+    __tablename__ = "field_lab_records"
+    __table_args__ = (UniqueConstraint("user_id", "record_id", name="uq_field_record_per_user"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("field_lab_users.id"), index=True)
+    record_id: Mapped[str] = mapped_column(String(100))
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class PaymentIntent(Base):
@@ -122,6 +134,10 @@ class RegisterInput(BaseModel):
 class LoginInput(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+
+
+class FieldRecordInput(BaseModel):
+    record: dict
 
 
 class TokenOutput(BaseModel):
@@ -552,6 +568,74 @@ def consume(payload: ConsumeInput, user: User = Depends(current_user), db: Sessi
         raise HTTPException(status_code=409, detail="تعذّر تثبيت عملية الحصة؛ أعد المحاولة بنفس معرّف الطلب.") from exc
     db.refresh(user)
     return usage_for(user)
+
+
+@app.get("/records")
+def list_field_records(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    rows = db.scalars(
+        select(FieldRecord).where(FieldRecord.user_id == user.id).order_by(FieldRecord.updated_at.desc())
+    ).all()
+    records = []
+    for row in rows:
+        try:
+            records.append(json.loads(row.payload_json))
+        except (TypeError, json.JSONDecodeError):
+            # A corrupt record is skipped rather than breaking access to every other record.
+            continue
+    return {"records": records, "count": len(records), "storage": "cloud"}
+
+
+@app.put("/records/{record_id}")
+def upsert_field_record(record_id: str, payload: FieldRecordInput,
+                        user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+    record = payload.record
+    if not record_id or len(record_id) > 100 or not all(ch.isalnum() or ch in "-_" for ch in record_id):
+        raise HTTPException(status_code=422, detail="معرّف السجل غير صالح.")
+    if str(record.get("id", "")) != record_id:
+        raise HTTPException(status_code=422, detail="معرّف السجل لا يطابق البيانات المرسلة.")
+    if not isinstance(record.get("siteName"), str) or not record["siteName"].strip() or len(record["siteName"]) > 100:
+        raise HTTPException(status_code=422, detail="اسم الموقع مطلوب وبحد أقصى 100 حرف.")
+    photos = record.get("photos", [])
+    if not isinstance(photos, list) or len(photos) > 6:
+        raise HTTPException(status_code=422, detail="يسمح بست صور كحد أقصى لكل سجل.")
+    try:
+        encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="محتوى السجل غير صالح.") from exc
+    if len(encoded.encode("utf-8")) > 32 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="حجم السجل يتجاوز 32 ميغابايت؛ قلّل حجم الصور ثم أعد المحاولة.")
+    now = datetime.now(timezone.utc)
+    row = db.scalar(select(FieldRecord).where(
+        FieldRecord.user_id == user.id, FieldRecord.record_id == record_id
+    ))
+    record["storage"] = "cloud"
+    encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+    if row:
+        row.payload_json = encoded
+        row.updated_at = now
+    else:
+        row = FieldRecord(user_id=user.id, record_id=record_id, payload_json=encoded,
+                          created_at=now, updated_at=now)
+        db.add(row)
+    try:
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="تعذر حفظ السجل في قاعدة البيانات الدائمة.") from exc
+    return {"status": "saved", "id": record_id, "storage": "cloud", "updated_at": now}
+
+
+@app.delete("/records/{record_id}")
+def delete_field_record(record_id: str, user: User = Depends(current_user),
+                        db: Session = Depends(get_db)) -> dict:
+    row = db.scalar(select(FieldRecord).where(
+        FieldRecord.user_id == user.id, FieldRecord.record_id == record_id
+    ))
+    if not row:
+        raise HTTPException(status_code=404, detail="السجل غير موجود في التخزين السحابي.")
+    db.delete(row)
+    db.commit()
+    return {"status": "deleted", "id": record_id}
 
 
 @app.get("/me")
