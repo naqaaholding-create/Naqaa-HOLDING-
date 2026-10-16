@@ -14,9 +14,6 @@ jobs:
   release-android:
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    defaults:
-      run:
-        working-directory: field-lab
     steps:
       - name: Verify signing secrets are configured
         env:
@@ -55,15 +52,18 @@ jobs:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
       - name: Install Capacitor dependencies
+        working-directory: field-lab
         run: npm install
 
       - name: Prepare Field Lab web assets
+        working-directory: field-lab
         run: |
           set -euo pipefail
           mkdir -p www
           cp *.html *.css *.js www/
 
       - name: Add Android platform and sync plugins
+        working-directory: field-lab
         run: |
           npx cap add android
           npx cap sync android
