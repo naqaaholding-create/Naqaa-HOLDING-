@@ -51,7 +51,14 @@
       api(path, {method:"POST", body:JSON.stringify({email:fields.get("email"), password:fields.get("password")})})
         .then(function (data) {
           saveToken(data.access_token);
-          return loadUsage();
+          return loadUsage().then(function () {
+            if (typeof window.FIELD_LAB_SYNC_RECORDS !== "function") return;
+            return window.FIELD_LAB_SYNC_RECORDS().then(function (result) {
+              if (result && !result.skipped) showMessage("تم تسجيل الدخول ومزامنة السجلات مع الخادم.");
+            }).catch(function () {
+              showMessage("تم تسجيل الدخول. تعذرت المزامنة الآن؛ ستبقى السجلات المحلية محفوظة.");
+            });
+          });
         })
         .catch(function (error) { showMessage(error.message, true); });
     });
