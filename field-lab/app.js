@@ -101,10 +101,17 @@
 
   function syncOneCloudRecord(record) {
     var copy = Object.assign({}, record, { storage: "cloud" });
-    return cloudRequest("/records/" + encodeURIComponent(copy.id), {
-      method: "PUT",
+    // Idempotent quota receipt prevents offline records from bypassing account limits.
+    return cloudRequest("/usage/consume", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ record: copy })
+      body: JSON.stringify({ action: "site", request_id: String(copy.id) })
+    }).then(function () {
+      return cloudRequest("/records/" + encodeURIComponent(copy.id), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record: copy })
+      });
     }).then(function () {
       return saveLocalRecord(copy).then(function () { return copy; });
     });
