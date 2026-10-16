@@ -1,0 +1,131 @@
+name: NAQAA Field Lab signed production APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: field-lab-android-release
+  cancel-in-progress: false
+
+jobs:
+  release-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Verify signing secrets are configured
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing GitHub Actions secret: ${name}. A signed production APK cannot be published until all Android signing secrets are configured."
+              exit 1
+            fi
+          done
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: field-lab/package.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Install Capacitor dependencies
+        working-directory: field-lab
+        run: npm install
+
+      - name: Prepare Field Lab web assets
+        working-directory: field-lab
+        run: |
+          set -euo pipefail
+          mkdir -p www
+          cp *.html *.css *.js www/
+
+      - name: Add Android platform and sync plugins
+        working-directory: field-lab
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Build release APK
+        working-directory: field-lab/android
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Sign and verify production APK
+        working-directory: field-lab/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/field-lab-release.jks"
+          ALIGNED="$RUNNER_TEMP/field-lab-release-aligned.apk"
+          SIGNED="$RUNNER_TEMP/NAQAA-Field-Lab-release.apk"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          "$BUILD_TOOLS/zipalign" -v -p 4 app/build/outputs/apk/release/app-release-unsigned.apk "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --out "$SIGNED" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$SIGNED"
+          mkdir -p release-output
+          cp "$SIGNED" release-output/NAQAA-Field-Lab-release.apk
+          sha256sum release-output/NAQAA-Field-Lab-release.apk > release-output/SHA256SUMS.txt
+          rm -f "$KEYSTORE" "$ALIGNED"
+
+      - name: Upload signed APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: naqaa-field-lab-signed-release
+          path: |
+            field-lab/android/release-output/NAQAA-Field-Lab-release.apk
+            field-lab/android/release-output/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish versioned GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: field-lab-v${{ github.run_number }}
+          name: NAQAA Field Lab Android Release ${{ github.run_number }}
+          body: |
+            Signed Android release build for NAQAA Field Lab.
+            Live cryptocurrency payments remain disabled unless the backend has been independently configured and verified.
+            Verify the APK with the accompanying SHA256SUMS.txt file.
+          files: |
+            field-lab/android/release-output/NAQAA-Field-Lab-release.apk
+            field-lab/android/release-output/SHA256SUMS.txt
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
