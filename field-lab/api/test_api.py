@@ -74,6 +74,62 @@ def test_protected_usage_requires_token():
     assert client.get("/me/usage").status_code == 401
     assert client.post("/usage/consume", json={"action": "site"}).status_code == 401
 
+def test_field_records_sync_across_sessions_and_are_user_scoped():
+    token_a = register(email="record-owner@example.com")
+    token_b = register(email="other-owner@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    record = {
+        "id": "NQ-TEST-RECORD-01",
+        "siteName": "موقع تجريبي",
+        "type": "surface",
+        "latitude": 31.5,
+        "longitude": 34.4,
+        "notes": "ملاحظة اختبار",
+        "photos": [],
+        "createdAt": 1800000000000,
+        "storage": "local-device",
+    }
+    saved = client.put("/records/NQ-TEST-RECORD-01", headers=headers_a, json={"record": record})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["storage"] == "cloud"
+
+    fetched = client.get("/records", headers=headers_a)
+    assert fetched.status_code == 200
+    assert fetched.json()["count"] == 1
+    assert fetched.json()["records"][0]["siteName"] == "موقع تجريبي"
+    assert fetched.json()["records"][0]["storage"] == "cloud"
+
+    other_user = client.get("/records", headers=headers_b)
+    assert other_user.status_code == 200
+    assert other_user.json()["count"] == 0
+
+    deleted = client.delete("/records/NQ-TEST-RECORD-01", headers=headers_a)
+    assert deleted.status_code == 200
+    assert client.get("/records", headers=headers_a).json()["count"] == 0
+
+
+def test_field_record_rejects_mismatched_ids_and_oversized_content():
+    token = register(email="record-validation@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    mismatch = client.put("/records/NQ-EXPECTED-01", headers=headers, json={
+        "record": {"id": "NQ-DIFFERENT-01", "siteName": "Test", "photos": []}
+    })
+    assert mismatch.status_code == 422
+
+    oversized = client.put("/records/NQ-LARGE-01", headers=headers, json={
+        "record": {"id": "NQ-LARGE-01", "siteName": "Test", "photos": [], "notes": "x" * (32 * 1024 * 1024 + 1)}
+    })
+    assert oversized.status_code == 413
+
+
+def test_field_records_require_authentication():
+    assert client.get("/records").status_code == 401
+    assert client.put("/records/NQ-UNAUTH-01", json={
+        "record": {"id": "NQ-UNAUTH-01", "siteName": "Test", "photos": []}
+    }).status_code == 401
+
+
 def test_payment_status_stays_disabled_even_if_readiness_values_exist(monkeypatch):
     monkeypatch.setenv("FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS", "T_TEST_ONLY_NOT_A_REAL_ADDRESS")
     monkeypatch.setenv("TRONGRID_API_KEY", "test-only-not-a-real-key")
