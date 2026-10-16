@@ -38,7 +38,30 @@ jobs:
       - name: Install Capacitor dependencies
         run: npm install
       - name: Prepare web assets
-        run: mkdir -p www && cp *.html *.css *.js www/
+        run: |
+          set -euo pipefail
+          mkdir -p www
+          cp *.html *.css *.js *.svg *.webmanifest www/
+      - name: Configure API URL for the native app when provided
+        env:
+          FIELD_LAB_API_BASE: ${{ vars.FIELD_LAB_API_BASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FIELD_LAB_API_BASE:-}" ]; then
+            echo "::warning::FIELD_LAB_API_BASE is not configured. The APK can be built for local/offline testing, but account and cloud-sync features will not work in the native app."
+            exit 0
+          fi
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises';
+          const raw = process.env.FIELD_LAB_API_BASE;
+          const url = new URL(raw);
+          if (url.protocol !== 'https:' || url.username || url.password ||
+              url.pathname !== '/' || url.search || url.hash) {
+            throw new Error('FIELD_LAB_API_BASE must be an HTTPS origin only, with no path, credentials, query, or fragment.');
+          }
+          await fs.appendFile('www/api-config.js', '\nwindow.FIELD_LAB_API_BASE = ' + JSON.stringify(url.origin) + ';\n');
+          console.log('Configured HTTPS API origin for native build.');
+          NODE
       - name: Add Android platform
         run: npx cap add android
       - name: Sync app assets
