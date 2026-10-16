@@ -1,0 +1,118 @@
+name: Deploy NAQAA Field Lab to Cloudflare
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cloudflare-d1-api-setup
+    paths:
+      - "field-lab/cloudflare/**"
+      - ".github/workflows/deploy-field-lab-cloudflare.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: naqaa-field-lab-cloudflare
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # A branch push deploys only when its commit message explicitly includes [deploy].
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check Worker JavaScript syntax
+        run: node --check field-lab/cloudflare/src/index.js
+
+      - name: Run API smoke tests
+        run: node --test field-lab/cloudflare/test/worker.test.mjs
+
+      - name: Install Wrangler
+        run: npm install --global wrangler
+
+      - name: Check Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Add the CLOUDFLARE_API_TOKEN repository secret."; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Add the CLOUDFLARE_ACCOUNT_ID repository variable."; exit 1; }
+
+      - name: Find or create D1 database
+        id: d1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database"
+          list="$(curl --fail-with-body --silent --show-error "$api" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")"
+          id="$(printf '%s' "$list" | jq -r '.result[]? | select(.name == "naqaa-field-lab-db") | .uuid' | head -n 1)"
+          if [ -z "$id" ]; then
+            created="$(curl --fail-with-body --silent --show-error -X POST "$api" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data '{"name":"naqaa-field-lab-db"}')"
+            id="$(printf '%s' "$created" | jq -r '.result.uuid // empty')"
+          fi
+          test -n "$id" || { echo "::error::Could not find or create the D1 database. Check the token permissions."; exit 1; }
+          echo "database_id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Configure deployment file
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_ID: ${{ steps.d1.outputs.database_id }}
+        run: |
+          set -euo pipefail
+          cd field-lab/cloudflare
+          jq --arg id "$DATABASE_ID" --arg account "$CLOUDFLARE_ACCOUNT_ID" '.account_id=$account | .d1_databases[0].database_id=$id' wrangler.jsonc > wrangler.deploy.jsonc
+
+      - name: Apply database schema
+        run: wrangler d1 execute naqaa-field-lab-db --remote --file=field-lab/cloudflare/schema.sql --config=field-lab/cloudflare/wrangler.deploy.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Worker
+        run: wrangler deploy --config=field-lab/cloudflare/wrangler.deploy.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Create JWT secret only if missing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          secrets="$(wrangler secret list --name naqaa-field-lab-api --config=field-lab/cloudflare/wrangler.deploy.jsonc)"
+          if ! printf '%s' "$secrets" | jq -e 'any(.[]?; .name == "JWT_SECRET")' >/dev/null; then
+            openssl rand -hex 32 | wrangler secret put JWT_SECRET --name naqaa-field-lab-api --config=field-lab/cloudflare/wrangler.deploy.jsonc
+          fi
+
+      - name: Final deployment
+        run: wrangler deploy --config=field-lab/cloudflare/wrangler.deploy.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Discover workers.dev URL
+        id: url
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")"
+          subdomain="$(printf '%s' "$response" | jq -r '.result.subdomain // empty')"
+          test -n "$subdomain" || { echo "::error::Cloudflare workers.dev subdomain is not configured for this account."; exit 1; }
+          echo "base_url=https://naqaa-field-lab-api.$subdomain.workers.dev" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test API
+        run: curl --fail-with-body --silent --show-error "${{ steps.url.outputs.base_url }}/health"

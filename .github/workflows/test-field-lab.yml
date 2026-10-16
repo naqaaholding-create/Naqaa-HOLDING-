@@ -1,0 +1,44 @@
+name: Test NAQAA Field Lab
+
+on:
+  push:
+    branches:
+      - cloudflare-d1-api-setup
+    paths:
+      - "field-lab/**"
+      - ".github/workflows/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "field-lab/**"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check field-lab/cloudflare/src/index.js
+          node --check field-lab/app.js
+          node --check field-lab/account.js
+          node --check field-lab/sharing.js
+          node --check field-lab/sw.js
+
+      - name: Validate PWA manifest JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('field-lab/manifest.webmanifest', 'utf8'))"
+
+      - name: Run Cloudflare API smoke tests
+        run: node --test field-lab/cloudflare/test/worker.test.mjs

@@ -12,8 +12,39 @@
     el("facebook-share").href = "https://www.facebook.com/sharer/sharer.php?u=" + url;
   }
   function status(message) { el("share-status").textContent = message; }
+  var deferredInstallPrompt = null;
+  function initInstall() {
+    var button = el("install-app-button");
+    if (!button) return;
+    window.addEventListener("beforeinstallprompt", function (event) {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+      button.hidden = false;
+    });
+    window.addEventListener("appinstalled", function () {
+      deferredInstallPrompt = null;
+      button.hidden = true;
+      status("تم تثبيت مختبر نقاء على هذا الجهاز.");
+    });
+    button.addEventListener("click", function () {
+      if (!deferredInstallPrompt) {
+        status("إذا لم يظهر زر التثبيت، افتح قائمة المتصفح واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية» عند توفرها.");
+        return;
+      }
+      var promptEvent = deferredInstallPrompt;
+      deferredInstallPrompt = null;
+      promptEvent.prompt();
+      promptEvent.userChoice.then(function (choice) {
+        button.hidden = true;
+        status(choice && choice.outcome === "accepted" ? "تم قبول تثبيت التطبيق." : "لم يتم التثبيت. يمكنك المتابعة باستخدام رابط HTTPS.");
+      }).catch(function () {
+        status("تعذر فتح نافذة التثبيت. استخدم قائمة المتصفح إذا كان التثبيت مدعومًا.");
+      });
+    });
+  }
   function init() {
     updateLinks();
+    initInstall();
     el("copy-share-link").addEventListener("click", function () {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(currentUrl()).then(function () {

@@ -180,6 +180,43 @@
     }).catch(function () { toast("تعذر قراءة السجلات المحلية."); });
   }
 
+  window.FIELD_LAB_SYNC_RECORDS = async function () {
+    var apiBase = String(window.FIELD_LAB_API_BASE || "").trim().replace(/\/$/, "");
+    var authToken = String(window.FIELD_LAB_AUTH_TOKEN || "");
+    if (!apiBase || !authToken) throw new Error("سجّل الدخول واضبط عنوان API أولًا.");
+    var headers = { "Authorization": "Bearer " + authToken, "Content-Type": "application/json", "Accept": "application/json" };
+    async function requestJson(path, options) {
+      var response = await fetch(apiBase + path, Object.assign({ headers: headers }, options || {}));
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok) throw new Error(data.detail || "تعذرت مزامنة السجلات.");
+      return data;
+    }
+    var localRecords = await allRecords();
+    for (var i = 0; i < localRecords.length; i++) {
+      var record = localRecords[i];
+      var cloudRecord = Object.assign({}, record, {
+        photos: (record.photos || []).map(function (photo) {
+          return { name: String(photo.name || "صورة ميدانية"), type: String(photo.type || "image/jpeg") };
+        }),
+        storage: "cloud-metadata-local-photos"
+      });
+      await requestJson("/records", { method: "POST", body: JSON.stringify(cloudRecord) });
+    }
+    var remote = await requestJson("/records");
+    var localIds = new Set(localRecords.map(function (record) { return record.id; }));
+    var imported = 0;
+    for (var j = 0; j < (remote.records || []).length; j++) {
+      var remoteRecord = remote.records[j];
+      if (!remoteRecord || !remoteRecord.id || localIds.has(remoteRecord.id)) continue;
+      remoteRecord.photos = [];
+      remoteRecord.storage = "cloud-metadata-local-photos";
+      await transact("readwrite", function (store) { return store.put(remoteRecord); });
+      imported++;
+    }
+    await renderRecords();
+    return { uploaded: localRecords.length, imported: imported, photosSynced: false };
+  };
+
   function safeFileName(value) {
     return String(value || "naqaa-field-record").replace(/[^\u0600-\u06FFa-zA-Z0-9_-]+/g, "-").slice(0, 50) || "naqaa-field-record";
   }
@@ -360,7 +397,30 @@
           stopCamera();
           return renderRecords();
         })
-        .then(function () { toast("تم حفظ السجل على هذا الجهاز فقط."); })
+        .then(function () {
+          if (!apiBase || !authToken) {
+            toast("تم حفظ السجل على هذا الجهاز فقط.");
+            return;
+          }
+          var cloudRecord = Object.assign({}, record, {
+            photos: (record.photos || []).map(function (photo) {
+              return { name: String(photo.name || "صورة ميدانية"), type: String(photo.type || "image/jpeg") };
+            }),
+            storage: "cloud-metadata-local-photos"
+          });
+          return fetch(apiBase + "/records", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + authToken, "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify(cloudRecord)
+          }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+              if (!response.ok) throw new Error(data.detail || "تعذرت مزامنة بيانات السجل.");
+              toast("حُفظ السجل محليًا ومُزامنة بياناته الوصفية. الصور ما زالت على هذا الجهاز.");
+            });
+          }).catch(function () {
+            toast("حُفظ السجل محليًا، لكن تعذرت مزامنته مع الخادم. احتفظ بنسخة JSON احتياطية.");
+          });
+        })
         .catch(function (error) {
           toast(error && error.name === "QuotaExceededError" ? "مساحة التخزين ممتلئة. صدّر سجلاتك واحذف الصور الكبيرة." : "تعذر الحفظ. قد تكون مساحة المتصفح ممتلئة.");
           throw error;

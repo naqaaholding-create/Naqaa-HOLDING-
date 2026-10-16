@@ -38,6 +38,13 @@
       document.getElementById("sites-usage").textContent = data.sites_used + " / " + data.sites_limit;
       document.getElementById("questions-usage").textContent = data.questions_used + " / " + data.questions_limit;
       usagePanel.hidden = false;
+      if (window.FIELD_LAB_SYNC_RECORDS) {
+        return window.FIELD_LAB_SYNC_RECORDS().then(function (result) {
+          showMessage("تم تسجيل الدخول ومزامنة بيانات السجلات (" + result.uploaded + " أُرسلت، " + result.imported + " استُوردت). الصور تبقى محليًا على الجهاز.");
+        }).catch(function () {
+          showMessage("تم تسجيل الدخول وعرض الحصة، لكن تعذرت مزامنة السجلات. الصور تبقى محليًا على الجهاز.", true);
+        });
+      }
       showMessage("تم تسجيل الدخول بنجاح. هذه الحصة محسوبة من الخادم.");
     });
   }
