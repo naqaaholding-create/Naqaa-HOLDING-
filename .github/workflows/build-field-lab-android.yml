@@ -41,7 +41,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p www
-          cp *.html *.css *.js *.svg *.webmanifest www/
+          cp *.html *.css *.js www/
+          for asset in *.svg *.webmanifest; do
+            if [ -f "$asset" ]; then cp "$asset" www/; fi
+          done
       - name: Configure API URL for the native app when provided
         env:
           FIELD_LAB_API_BASE: ${{ vars.FIELD_LAB_API_BASE }}
