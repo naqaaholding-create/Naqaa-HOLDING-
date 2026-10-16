@@ -7,11 +7,13 @@ on:
       - "field-lab/**"
       - "render.field-lab.yaml"
       - ".github/workflows/field-lab-ci.yml"
+      - ".github/workflows/field-lab-signed-android-release.yml"
   pull_request:
     paths:
       - "field-lab/**"
       - "render.field-lab.yaml"
       - ".github/workflows/field-lab-ci.yml"
+      - ".github/workflows/field-lab-signed-android-release.yml"
   workflow_dispatch:
 
 permissions:
@@ -67,6 +69,10 @@ jobs:
           test -s field-lab/api/main.py
           test -s field-lab/api/payments_live.py
           test -s render.field-lab.yaml
+          test -s .github/workflows/field-lab-signed-android-release.yml
+          grep -q 'release_mode:' .github/workflows/field-lab-signed-android-release.yml
+          grep -q 'payments_disabled' .github/workflows/field-lab-signed-android-release.yml
+          grep -q 'live_payments' .github/workflows/field-lab-signed-android-release.yml
           grep -q 'FIELD_LAB_LIVE_PAYMENTS_ENABLED' render.field-lab.yaml
           grep -Eq 'value: "0"|value: 0' render.field-lab.yaml
           grep -q 'FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS' render.field-lab.yaml
