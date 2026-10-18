@@ -16,4 +16,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: pytest -q tests/test_marketplace_finance.py
+      - name: Run all automated tests
+        run: pytest -q tests
