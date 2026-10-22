@@ -69,3 +69,14 @@
 ## معاينة عبر Chrome
 
 بعد نشر Render، افتح رابط الخدمة عبر HTTPS ثم أضف `/field-lab/`. هذه النسخة تعرض توثيق المواقع محليًا مع الحفظ والتصدير؛ لا يوجد تحليل علمي آلي بعد. لا ترسل أي مبلغ ما دام التطبيق يعرض أن الدفع مغلق.
+
+## Telegram bot integration (production setup)
+
+The API includes a secured Telegram webhook at `POST /telegram/webhook` and a non-secret readiness endpoint at `GET /telegram/status`. The bot supports `/start`, `/app`, and `/help`. The webhook checks Telegram's secret-token header before processing updates.
+
+Configure these values in the existing API service's secret/environment settings (never commit them):
+- `TELEGRAM_BOT_TOKEN`: token created with Telegram's official BotFather.
+- `TELEGRAM_WEBHOOK_SECRET`: a random secret of 32+ characters, kept private.
+- `FIELD_LAB_PUBLIC_URL`: the public HTTPS URL of the Field Lab web interface.
+
+After the API deploys, register the webhook with Telegram using Bot API `setWebhook`, targeting `https://YOUR-API-HOST/telegram/webhook` and passing the same `secret_token` configured above. Confirm `GET /telegram/status` reports the settings present, then send `/start` to the bot and verify its reply. Code deployment alone does not register the webhook or activate the bot; those steps require the real bot token and the existing API's public HTTPS URL.
