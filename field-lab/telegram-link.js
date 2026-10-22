@@ -7,7 +7,7 @@
     var link = document.createElement("a");
     link.id = "telegram-bot-link";
     link.className = "button button-primary";
-    link.href = "https://t.me/naqaa_field_lab";
+    link.href = "https://t.me/naqaa_field_lab?start=field_lab_app";
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.textContent = "فتح بوت NAQAA Field Lab على Telegram";
