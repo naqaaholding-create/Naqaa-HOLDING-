@@ -36,7 +36,18 @@ jobs:
         with:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
       - name: Install Capacitor dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
+      - name: Validate installed dependency tree
+        run: npm ls --depth=0
+      - name: Check JavaScript syntax
+        run: |
+          for file in *.js; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+      - name: Validate Capacitor app configuration
+        run: |
+          node -e 'const c=require("./capacitor.config.json"); if(c.appId!=="com.naqaaholding.fieldlab" || c.appName!=="NAQAA Field Lab" || c.webDir!=="www") process.exit(1); console.log("Capacitor configuration is valid.")'
       - name: Prepare web assets
         run: mkdir -p www && cp *.html *.css *.js www/
       - name: Configure API URL for Android
