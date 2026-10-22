@@ -39,6 +39,9 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Validate installed dependency tree
         run: npm ls --depth=0
+      - name: Validate Field Lab API Python syntax
+        working-directory: .
+        run: python3 -m py_compile field-lab/api/main.py field-lab/api/payments_live.py field-lab/api/payments_testnet.py field-lab/api/telegram_integration.py
       - name: Check JavaScript syntax
         run: |
           for file in *.js; do
