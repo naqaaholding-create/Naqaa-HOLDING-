@@ -19,6 +19,7 @@ from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uniqu
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from payments_live import PaymentVerificationError, address_to_hex20, check_mainnet_provider, verify_usdt_transfer
+from telegram_integration import router as telegram_router
 
 DATABASE_URL = os.getenv("FIELD_LAB_DATABASE_URL", "sqlite:///./field_lab.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -106,6 +107,7 @@ class PaymentIntent(Base):
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="NAQAA Field Lab API", version="0.1.0", description="Accounts and usage quotas for NAQAA Field Lab.")
+app.include_router(telegram_router)
 
 allowed_origins = [x.strip() for x in os.getenv("FIELD_LAB_ALLOWED_ORIGINS", "").split(",") if x.strip()]
 if allowed_origins:
