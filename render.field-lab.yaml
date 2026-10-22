@@ -30,6 +30,12 @@ services:
         sync: false
       - key: FIELD_LAB_TRON_MIN_CONFIRMATIONS
         value: "20"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: FIELD_LAB_PUBLIC_URL
+        sync: false
 
 databases:
   - name: naqaa-field-lab-db
