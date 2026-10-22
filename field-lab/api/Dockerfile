@@ -3,7 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8000 FIELD_LAB_ENV=product
 WORKDIR /app
 COPY field-lab/api/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY field-lab/api/main.py field-lab/api/payments_testnet.py field-lab/api/payments_live.py ./
+COPY field-lab/api/main.py field-lab/api/payments_testnet.py field-lab/api/payments_live.py field-lab/api/telegram_integration.py ./
 RUN mkdir -p /app/static/field-lab
 COPY field-lab/*.html field-lab/*.css field-lab/*.js ./static/field-lab/
 EXPOSE 8000
