@@ -54,3 +54,26 @@ Run `pip install -r requirements.txt pytest httpx` and then `pytest -q`. GitHub 
 The payment feature accepts subscription purchases only; this app has no withdrawal feature. It accepts USDT solely on TRON (TRC20) to the configured public receiving address. The server validates the official Tether contract, exact amount, receiver, the sender address declared before checkout, successful execution, invoice time window, at least 20 confirmations, and unique transaction IDs. Customers must send directly from that declared TRON wallet address; third-party exchange transfers may not match the sender check. Subscription activation is committed with the payment record in the same database transaction. Never commit the receiver address or provider API key to Git; set these only in the hosting provider's secret/environment settings. Never request or store a SafePal seed phrase or private key.
 
 Live payments require `FIELD_LAB_ENV=production`, `FIELD_LAB_LIVE_PAYMENTS_ENABLED=1`, a valid `FIELD_LAB_TRON_USDT_RECEIVE_ADDRESS`, `TRONGRID_API_KEY`, persistent PostgreSQL at `FIELD_LAB_DATABASE_URL`, and an HTTPS origin in `FIELD_LAB_ALLOWED_ORIGINS`. The default payment flag is off. Verify the receiving address in SafePal and the canonical contract with Tether's official documentation before enabling checkout. Do not tell customers to send funds while `GET /payments/status` reports `payments_enabled: false`.
+
+## Telegram bot integration
+
+The Telegram router is included in `main.py` and exposes:
+
+- `GET /telegram/status` — reports whether the required Telegram settings are present.
+- `POST /telegram/webhook` — receives Telegram updates and checks the `X-Telegram-Bot-Api-Secret-Token` header.
+
+To activate the existing bot `@naqaa_field_lab` on the current API deployment, set these environment variables in that deployment's existing secret/settings panel (do not commit actual values):
+
+- `TELEGRAM_BOT_TOKEN`: token from BotFather.
+- `TELEGRAM_WEBHOOK_SECRET`: a random 32+ character secret using only letters, digits, underscore, or hyphen.
+- `FIELD_LAB_PUBLIC_URL`: the actual public HTTPS URL of NAQAA Field Lab, without a trailing slash.
+
+Then register the webhook once from a trusted terminal, replacing the placeholders locally and never sharing the token:
+
+```sh
+curl -sS -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  -d "url=$FIELD_LAB_PUBLIC_URL/telegram/webhook" \
+  -d "secret_token=$TELEGRAM_WEBHOOK_SECRET"
+```
+
+Verify `GET $FIELD_LAB_PUBLIC_URL/telegram/status` reports `configured: true` and `webhook_ready: true`, then send `/start` to `@naqaa_field_lab`. Use Telegram's `getWebhookInfo` endpoint privately to confirm that the webhook URL is registered and there is no recent delivery error. Never paste the bot token into source code, GitHub commits, or chat. The current bot supports start/help and opening the app; account-level Telegram linking and secure user identity binding are not implemented by this basic webhook yet.
